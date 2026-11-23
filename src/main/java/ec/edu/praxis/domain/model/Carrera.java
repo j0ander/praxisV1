@@ -1,0 +1,87 @@
+package ec.edu.praxis.domain.model;
+
+import java.time.OffsetDateTime;
+
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+/** Entidad de la tabla carrera (MODELO_DATOS.md §4.5). */
+@Entity
+@Table(name = "carrera")
+public class Carrera {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "facultad_id", nullable = false)
+    private Long facultadId;
+
+    @Column(name = "codigo", nullable = false)
+    private String codigo;
+
+    @Column(name = "nombre", nullable = false)
+    private String nombre;
+
+    @Column(name = "activa", nullable = false)
+    private boolean activa = true;
+
+    @Generated(event = EventType.INSERT)
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    @Generated(event = { EventType.INSERT, EventType.UPDATE })
+    @Column(name = "updated_at", insertable = false, updatable = false)
+    private OffsetDateTime updatedAt;
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getFacultadId() {
+        return facultadId;
+    }
+
+    public void setFacultadId(Long facultadId) {
+        this.facultadId = facultadId;
+    }
+
+    public String getCodigo() {
+        return codigo;
+    }
+
+    public void setCodigo(String codigo) {
+        this.codigo = codigo;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
+    public boolean isActiva() {
+        return activa;
+    }
+
+    public void setActiva(boolean activa) {
+        this.activa = activa;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+}

@@ -1,0 +1,13 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+
+import App from './App';
+import './styles/global.css';
+import './styles/layout.css';
+import './styles/componentes.css';
+
+createRoot(document.getElementById('raiz')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);

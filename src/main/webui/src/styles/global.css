@@ -1,0 +1,52 @@
+@import './variables.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#raiz {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--fondo-general);
+  color: var(--texto);
+  font-family: Arimo, Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 12px;
+  color: var(--azul-principal);
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+h2 {
+  font-size: 19px;
+}
+
+h3 {
+  font-size: 16px;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+a {
+  color: var(--azul-secundario);
+}
+
+small {
+  color: var(--texto-suave);
+}

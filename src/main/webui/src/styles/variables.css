@@ -1,0 +1,14 @@
+:root {
+  --azul-principal: #0b4a8a;
+  --azul-secundario: #0a6cbf;
+  --azul-activo: #0b7bc7;
+  --fondo-general: #fbf9f8;
+  --fondo-navegacion: #f8f8f8;
+  --borde: #d9d9d9;
+  --texto: #333333;
+  --texto-suave: #666666;
+  --blanco: #ffffff;
+  --rojo: #a33a3a;
+  --verde: #2f6b45;
+  --ancho-contenido: 1100px;
+}
