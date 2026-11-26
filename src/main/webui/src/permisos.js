@@ -49,7 +49,6 @@ export const MODULOS = [
     roles: [
       'ADMINISTRADOR',
       'COORDINADOR',
-      'TUTOR_EMPRESARIAL',
       'REPRESENTANTE_EMPRESA',
       'AUTORIDAD',
     ],

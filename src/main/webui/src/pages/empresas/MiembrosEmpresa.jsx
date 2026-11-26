@@ -164,7 +164,6 @@ export default function MiembrosEmpresa({ empresaId, puedeGestionar = true }) {
       <div className="tarjeta__cabecera">
         <div>
           <h2>Miembros</h2>
-          <p>Las bajas son lógicas; la empresa debe conservar un ADMIN_EMPRESA activo.</p>
         </div>
         {puedeGestionar && !formulario ? <Boton onClick={abrirCrear}>Vincular miembro</Boton> : null}
       </div>
@@ -217,7 +216,7 @@ export default function MiembrosEmpresa({ empresaId, puedeGestionar = true }) {
           {cambioRiesgoso ? (
             <MensajeEstado
               tipo="info"
-              mensaje="Es el último ADMIN_EMPRESA activo: desactivarlo o degradarlo será rechazado por el backend."
+              mensaje="Es el último administrador de la empresa activo: desactivarlo o degradarlo será rechazado por el backend."
             />
           ) : null}
           <div className="formulario__acciones">

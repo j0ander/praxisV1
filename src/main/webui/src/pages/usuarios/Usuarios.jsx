@@ -15,6 +15,11 @@ import {
 } from '../../services/usuarioService';
 
 const FILTROS_INICIALES = { rol: '', activo: '', texto: '' };
+const MENSAJE_ADMINISTRADOR = 'Las cuentas de administrador no se pueden desactivar.';
+
+function esAdministrador(usuario) {
+  return (usuario.roles || []).includes('ADMINISTRADOR');
+}
 
 export default function Usuarios() {
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
@@ -46,6 +51,11 @@ export default function Usuarios() {
     setProcesando(true);
     setError(null);
     try {
+      if (esAdministrador(confirmacion.usuario)) {
+        setError(MENSAJE_ADMINISTRADOR);
+        setConfirmacion(null);
+        return;
+      }
       if (confirmacion.accion === 'activar') {
         await activarUsuario(confirmacion.usuario.id);
         setResultado({ tipo: 'exito', mensaje: 'Usuario activado.' });
@@ -98,7 +108,9 @@ export default function Usuarios() {
           <RutaEnlace a={`/admin/usuarios/${usuario.id}`} className="boton boton--enlace boton--pequeno">
             Ver / Editar
           </RutaEnlace>
-          {usuario.activo ? (
+          {esAdministrador(usuario) ? (
+            <small>{MENSAJE_ADMINISTRADOR}</small>
+          ) : usuario.activo ? (
             <Boton
               variante="enlace"
               pequeno
