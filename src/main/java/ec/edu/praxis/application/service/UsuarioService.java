@@ -30,6 +30,7 @@ public class UsuarioService {
     private static final Pattern CEDULA = Pattern.compile("^[0-9]{10}$");
     private static final Pattern PASAPORTE = Pattern.compile("^[A-Z0-9]{5,20}$");
     private static final Set<String> TIPOS_DOCUMENTO = Set.of("CEDULA", "PASAPORTE");
+    private static final String ROL_COORDINADOR = "COORDINADOR";
 
     @Inject
     UsuarioRepository repository;
@@ -149,6 +150,12 @@ public class UsuarioService {
             }
         }
 
+        if (roles.containsKey(ROL_COORDINADOR)
+                && usuarioCarreraRepository.listarCarrerasPorUsuario(id).size() > 1) {
+            throw ApiException.reglaNegocio(
+                    "Un coordinador solo puede tener una carrera asignada. Ajuste las carreras antes de asignar el rol.");
+        }
+
         for (UsuarioRol relacion : usuarioRolRepository.listarPorUsuario(id)) {
             usuarioRolRepository.delete(relacion);
         }
@@ -176,6 +183,10 @@ public class UsuarioService {
             }
             carreras.add(carreraId);
         }
+        if (usuarioRolRepository.listarCodigosPorUsuario(id).contains(ROL_COORDINADOR)
+                && carreras.size() > 1) {
+            throw ApiException.reglaNegocio("Un coordinador solo puede tener una carrera asignada.");
+        }
 
         for (UsuarioCarrera relacion : usuarioCarreraRepository.listarPorUsuario(id)) {
             usuarioCarreraRepository.delete(relacion);
@@ -185,6 +196,45 @@ public class UsuarioService {
             usuarioCarreraRepository.persist(new UsuarioCarrera(id, carreraId));
         }
         usuarioCarreraRepository.flush();
+    }
+
+    @Transactional
+    public void asignarCarreraCoordinador(Long id, Long carreraId) {
+        buscarUsuario(id);
+        if (!usuarioRolRepository.listarCodigosPorUsuario(id).contains(ROL_COORDINADOR)) {
+            throw ApiException.reglaNegocio(
+                    "El usuario debe tener el rol COORDINADOR para asignar una carrera de coordinación.");
+        }
+        if (carreraId == null) {
+            throw ApiException.datosInvalidos("La carrera del coordinador es obligatoria.");
+        }
+        if (carreraRepository.findById(carreraId) == null) {
+            throw ApiException.reglaNegocio("La carrera no existe.");
+        }
+
+        for (UsuarioCarrera relacion : usuarioCarreraRepository.listarPorUsuario(id)) {
+            usuarioCarreraRepository.delete(relacion);
+        }
+        usuarioCarreraRepository.flush();
+        usuarioCarreraRepository.persist(new UsuarioCarrera(id, carreraId));
+        usuarioCarreraRepository.flush();
+    }
+
+    public Long carreraDeCoordinador(Long id) {
+        if (id == null) {
+            throw ApiException.datosInvalidos("El usuario del coordinador es obligatorio.");
+        }
+        if (!usuarioRolRepository.listarCodigosPorUsuario(id).contains(ROL_COORDINADOR)) {
+            throw ApiException.reglaNegocio("El usuario no tiene el rol COORDINADOR.");
+        }
+        List<Long> carreras = usuarioCarreraRepository.listarCarrerasPorUsuario(id);
+        if (carreras.isEmpty()) {
+            throw ApiException.reglaNegocio("El coordinador no tiene una carrera asignada.");
+        }
+        if (carreras.size() > 1) {
+            throw ApiException.reglaNegocio("El coordinador tiene más de una carrera asignada.");
+        }
+        return carreras.get(0);
     }
 
     private Usuario buscarUsuario(Long id) {

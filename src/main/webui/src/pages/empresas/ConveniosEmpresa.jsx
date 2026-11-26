@@ -67,6 +67,7 @@ export default function ConveniosEmpresa({ empresaId, puedeEditar = true }) {
   }
 
   function abrirCrear() {
+    if (!puedeEditar) return;
     setResultado(null);
     setError(null);
     setErroresCampos({});
@@ -75,6 +76,7 @@ export default function ConveniosEmpresa({ empresaId, puedeEditar = true }) {
   }
 
   function abrirEditar(convenio) {
+    if (!puedeEditar) return;
     setResultado(null);
     setError(null);
     setErroresCampos({});
@@ -106,6 +108,7 @@ export default function ConveniosEmpresa({ empresaId, puedeEditar = true }) {
 
   async function guardar(evento) {
     evento.preventDefault();
+    if (!puedeEditar) return;
     const errores = validar();
     setErroresCampos(errores);
     if (Object.keys(errores).length > 0) return;
@@ -141,6 +144,7 @@ export default function ConveniosEmpresa({ empresaId, puedeEditar = true }) {
   }
 
   async function confirmarAccion() {
+    if (!puedeEditar) return;
     setProcesando(true);
     setError(null);
     setResultado(null);

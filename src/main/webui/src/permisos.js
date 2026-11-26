@@ -10,25 +10,25 @@ export const MODULOS = [
     ruta: '/admin/facultades',
     etiqueta: 'Facultades',
     detalle: 'Estructura académica.',
-    roles: ['ADMINISTRADOR', 'COORDINADOR', 'AUTORIDAD'],
+    roles: ['ADMINISTRADOR', 'AUTORIDAD'],
   },
   {
     ruta: '/admin/carreras',
     etiqueta: 'Carreras',
     detalle: 'Carreras de cada facultad.',
-    roles: ['ADMINISTRADOR', 'COORDINADOR', 'AUTORIDAD'],
+    roles: ['ADMINISTRADOR', 'AUTORIDAD'],
   },
   {
     ruta: '/admin/periodos',
     etiqueta: 'Periodos',
     detalle: 'Periodos académicos.',
-    roles: ['ADMINISTRADOR', 'COORDINADOR', 'AUTORIDAD'],
+    roles: ['ADMINISTRADOR', 'AUTORIDAD'],
   },
   {
     ruta: '/admin/tipos-practica',
     etiqueta: 'Tipos de práctica',
     detalle: 'Tipos de práctica preprofesional.',
-    roles: ['ADMINISTRADOR', 'COORDINADOR', 'AUTORIDAD'],
+    roles: ['ADMINISTRADOR', 'AUTORIDAD'],
   },
   {
     ruta: '/estudiantes',
@@ -40,7 +40,7 @@ export const MODULOS = [
     ruta: '/docentes',
     etiqueta: 'Docentes',
     detalle: 'Perfiles académicos de docentes.',
-    roles: ['ADMINISTRADOR', 'COORDINADOR'],
+    roles: ['ADMINISTRADOR'],
   },
   {
     ruta: '/empresas',
@@ -48,7 +48,6 @@ export const MODULOS = [
     detalle: 'Empresas, miembros, convenios y tutores.',
     roles: [
       'ADMINISTRADOR',
-      'COORDINADOR',
       'REPRESENTANTE_EMPRESA',
       'AUTORIDAD',
     ],
@@ -57,6 +56,22 @@ export const MODULOS = [
 
 function tieneRol(roles, permitidos) {
   return Array.isArray(roles) && roles.some((rol) => permitidos.includes(rol));
+}
+
+const ROLES_CON_ACCESO_TOTAL_EMPRESAS = ['ADMINISTRADOR', 'AUTORIDAD'];
+
+export function puedeCrearEmpresa(roles) {
+  return tieneRol(roles, ROLES_CON_ACCESO_TOTAL_EMPRESAS);
+}
+
+export function esRepresentanteRestringido(roles) {
+  return tieneRol(roles, ['REPRESENTANTE_EMPRESA'])
+    && !tieneRol(roles, ROLES_CON_ACCESO_TOTAL_EMPRESAS);
+}
+
+export function esCoordinador(roles) {
+  return tieneRol(roles, ['COORDINADOR'])
+    && !tieneRol(roles, ['ADMINISTRADOR', 'AUTORIDAD']);
 }
 
 export function modulosPermitidos(roles) {

@@ -42,6 +42,7 @@ export default function TutoresEmpresa({ empresaId, puedeGestionar = true }) {
   }
 
   function abrirCrear() {
+    if (!puedeGestionar) return;
     setResultado(null);
     setError(null);
     setErroresCampos({});
@@ -50,6 +51,7 @@ export default function TutoresEmpresa({ empresaId, puedeGestionar = true }) {
   }
 
   function abrirEditar(tutor) {
+    if (!puedeGestionar) return;
     setResultado(null);
     setError(null);
     setErroresCampos({});
@@ -72,6 +74,7 @@ export default function TutoresEmpresa({ empresaId, puedeGestionar = true }) {
 
   async function guardar(evento) {
     evento.preventDefault();
+    if (!puedeGestionar) return;
     const errores = validar();
     setErroresCampos(errores);
     if (Object.keys(errores).length > 0) return;

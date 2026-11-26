@@ -9,6 +9,7 @@ import { mensajeDeError } from '../../services/api';
 import { listarCarreras } from '../../services/estructuraService';
 import {
   actualizarUsuario,
+  asignarCarreraCoordinador,
   asignarCarreras,
   asignarRoles,
   buscarUsuario,
@@ -33,6 +34,7 @@ export default function FormularioUsuario({ id }) {
   const [formulario, setFormulario] = useState(FORMULARIO_VACIO);
   const [roles, setRoles] = useState([]);
   const [carreraIds, setCarreraIds] = useState([]);
+  const [carreraCoordinador, setCarreraCoordinador] = useState('');
   const [carreras, setCarreras] = useState([]);
   const [cargando, setCargando] = useState(!esNuevo);
   const [guardando, setGuardando] = useState(false);
@@ -41,6 +43,7 @@ export default function FormularioUsuario({ id }) {
   const [resultado, setResultado] = useState(null);
   const [modalPassword, setModalPassword] = useState(false);
   const [passwordTemporal, setPasswordTemporal] = useState('');
+  const coordinador = roles.includes('COORDINADOR');
 
   useEffect(() => {
     listarCarreras()
@@ -55,6 +58,7 @@ export default function FormularioUsuario({ id }) {
       setFormulario(FORMULARIO_VACIO);
       setRoles([]);
       setCarreraIds([]);
+      setCarreraCoordinador('');
       return;
     }
     let activo = true;
@@ -74,6 +78,11 @@ export default function FormularioUsuario({ id }) {
         });
         setRoles(Array.isArray(datos.roles) ? datos.roles : []);
         setCarreraIds((datos.carreraIds || []).map(String));
+        setCarreraCoordinador(
+          Array.isArray(datos.carreraIds) && datos.carreraIds.length > 0
+            ? String(datos.carreraIds[0])
+            : '',
+        );
       })
       .catch((fallo) => {
         if (activo) setError(mensajeDeError(fallo));
@@ -148,6 +157,25 @@ export default function FormularioUsuario({ id }) {
     try {
       await asignarCarreras(id, carreraIds.map(Number));
       setResultado({ tipo: 'exito', mensaje: 'Carreras actualizadas.' });
+    } catch (fallo) {
+      setError(mensajeDeError(fallo));
+    } finally {
+      setGuardandoPermisos('');
+    }
+  }
+
+  async function guardarCarreraCoordinador() {
+    setGuardandoPermisos('carreras');
+    setError(null);
+    setResultado(null);
+    if (!carreraCoordinador) {
+      setError('Seleccione una carrera para el coordinador.');
+      setGuardandoPermisos('');
+      return;
+    }
+    try {
+      await asignarCarreraCoordinador(Number(id), Number(carreraCoordinador));
+      setResultado({ tipo: 'exito', mensaje: 'Carrera del coordinador actualizada.' });
     } catch (fallo) {
       setError(mensajeDeError(fallo));
     } finally {
@@ -289,28 +317,57 @@ export default function FormularioUsuario({ id }) {
           </section>
 
           <section className="tarjeta">
-            <h2>Carreras del ámbito</h2>
+            <h2>{coordinador ? 'Carrera del coordinador' : 'Carreras del ámbito'}</h2>
             {carreras.length === 0 ? (
               <MensajeEstado mensaje="No hay carreras registradas." />
+            ) : coordinador ? (
+              <>
+                <p>Un coordinador solo puede tener una carrera asignada.</p>
+                <CampoFormulario id="carrera-coordinador" etiqueta="Carrera" obligatorio>
+                  <select
+                    id="carrera-coordinador"
+                    value={carreraCoordinador}
+                    onChange={(evento) => setCarreraCoordinador(evento.target.value)}
+                    required
+                  >
+                    <option value="">Seleccione una carrera</option>
+                    {carreras.map((carrera) => (
+                      <option key={carrera.id} value={carrera.id}>
+                        {carrera.nombre} ({carrera.codigo}){carrera.activa ? '' : ' · inactiva'}
+                      </option>
+                    ))}
+                  </select>
+                </CampoFormulario>
+                <div className="formulario__acciones">
+                  <Boton
+                    onClick={guardarCarreraCoordinador}
+                    cargando={guardandoPermisos === 'carreras'}
+                  >
+                    Guardar carrera del coordinador
+                  </Boton>
+                </div>
+              </>
             ) : (
-              <div className="lista-opciones">
-                {carreras.map((carrera) => (
-                  <label key={carrera.id} className="opcion">
-                    <input
-                      type="checkbox"
-                      checked={carreraIds.includes(String(carrera.id))}
-                      onChange={() => alternarCarrera(String(carrera.id))}
-                    />
-                    {carrera.nombre} ({carrera.codigo}){carrera.activa ? '' : ' · inactiva'}
-                  </label>
-                ))}
-              </div>
+              <>
+                <div className="lista-opciones">
+                  {carreras.map((carrera) => (
+                    <label key={carrera.id} className="opcion">
+                      <input
+                        type="checkbox"
+                        checked={carreraIds.includes(String(carrera.id))}
+                        onChange={() => alternarCarrera(String(carrera.id))}
+                      />
+                      {carrera.nombre} ({carrera.codigo}){carrera.activa ? '' : ' · inactiva'}
+                    </label>
+                  ))}
+                </div>
+                <div className="formulario__acciones">
+                  <Boton onClick={guardarCarreras} cargando={guardandoPermisos === 'carreras'}>
+                    Guardar carreras
+                  </Boton>
+                </div>
+              </>
             )}
-            <div className="formulario__acciones">
-              <Boton onClick={guardarCarreras} cargando={guardandoPermisos === 'carreras'}>
-                Guardar carreras
-              </Boton>
-            </div>
           </section>
 
           <section className="tarjeta">

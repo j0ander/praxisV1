@@ -35,6 +35,17 @@ public class EstudianteResource {
         return Response.ok(respuesta).build();
     }
 
+    // El id del coordinador es un parámetro de dominio, no una identidad autenticada.
+    // La API no dispone de actor por petición; sustituir por la identidad del solicitante
+    // cuando se implemente autenticación real.
+    @GET
+    @Path("/listarPorCoordinador/{coordinadorId}")
+    public Response listarPorCoordinador(@PathParam("coordinadorId") Long coordinadorId) {
+        List<EstudianteResponse> respuesta = service.listarPorCoordinador(coordinadorId).stream()
+                .map(EstudianteResponse::new).toList();
+        return Response.ok(respuesta).build();
+    }
+
     @GET
     @Path("/buscar/{id}")
     public Response buscar(@PathParam("id") Long id) {

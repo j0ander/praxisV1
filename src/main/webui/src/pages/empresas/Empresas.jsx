@@ -6,7 +6,11 @@ import MensajeEstado from '../../components/comunes/MensajeEstado';
 import RutaEnlace from '../../components/comunes/RutaEnlace';
 import Tabla from '../../components/comunes/Tabla';
 import { mensajeDeError } from '../../services/api';
-import { crearEmpresa, listarEmpresas } from '../../services/empresaService';
+import {
+  crearEmpresa,
+  listarEmpresas,
+  listarEmpresasAsociadas,
+} from '../../services/empresaService';
 import { validarDatosEmpresa } from './validacionesEmpresa';
 
 const FORMULARIO_VACIO = {
@@ -18,7 +22,7 @@ const FORMULARIO_VACIO = {
   correo: '',
 };
 
-export default function Empresas() {
+export default function Empresas({ puedeCrearEmpresa = false, usuarioId = null, soloMiEmpresa = false }) {
   const [texto, setTexto] = useState('');
   const [filtro, setFiltro] = useState('');
   const [empresas, setEmpresas] = useState([]);
@@ -30,14 +34,19 @@ export default function Empresas() {
   const [erroresCampos, setErroresCampos] = useState({});
   const [guardando, setGuardando] = useState(false);
 
+  const formularioVisible = puedeCrearEmpresa && mostrandoFormulario;
+
   const cargar = useCallback(() => {
     setCargando(true);
     setError(null);
-    listarEmpresas(filtro)
+    const consulta = soloMiEmpresa
+      ? listarEmpresasAsociadas(usuarioId, filtro)
+      : listarEmpresas(filtro);
+    consulta
       .then((datos) => setEmpresas(Array.isArray(datos) ? datos : []))
       .catch((fallo) => setError(mensajeDeError(fallo)))
       .finally(() => setCargando(false));
-  }, [filtro]);
+  }, [filtro, soloMiEmpresa, usuarioId]);
 
   useEffect(() => {
     cargar();
@@ -59,6 +68,7 @@ export default function Empresas() {
   }
 
   function abrirFormulario() {
+    if (!puedeCrearEmpresa) return;
     setResultado(null);
     setError(null);
     setErroresCampos({});
@@ -68,6 +78,7 @@ export default function Empresas() {
 
   async function guardar(evento) {
     evento.preventDefault();
+    if (!puedeCrearEmpresa) return;
     const errores = validarDatosEmpresa(formulario);
     setErroresCampos(errores);
     if (Object.keys(errores).length > 0) return;
@@ -125,15 +136,15 @@ export default function Empresas() {
           <h1>Empresas</h1>
           <p>Consulte y registre las empresas receptoras de prácticas.</p>
         </div>
-        {!mostrandoFormulario ? (
+        {puedeCrearEmpresa && !mostrandoFormulario ? (
           <Boton onClick={abrirFormulario}>Nueva empresa</Boton>
         ) : null}
       </div>
 
       <MensajeEstado tipo={resultado?.tipo} mensaje={resultado?.mensaje} />
-      <MensajeEstado tipo="error" mensaje={error} onReintentar={mostrandoFormulario ? null : cargar} />
+      <MensajeEstado tipo="error" mensaje={error} onReintentar={formularioVisible ? null : cargar} />
 
-      {mostrandoFormulario ? (
+      {formularioVisible ? (
         <form className="tarjeta" onSubmit={guardar}>
           <h2>Nueva empresa</h2>
           <div className="rejilla">

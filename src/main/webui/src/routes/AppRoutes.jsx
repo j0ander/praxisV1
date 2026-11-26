@@ -14,12 +14,21 @@ import Estudiantes from '../pages/estudiantes/Estudiantes';
 import Inicio from '../pages/inicio/Inicio';
 import FormularioUsuario from '../pages/usuarios/FormularioUsuario';
 import Usuarios from '../pages/usuarios/Usuarios';
-import { modulosPermitidos, primeraRutaPermitida, rutaPermitida } from '../permisos';
+import {
+  esCoordinador,
+  esRepresentanteRestringido,
+  modulosPermitidos,
+  primeraRutaPermitida,
+  puedeCrearEmpresa,
+  rutaPermitida,
+} from '../permisos';
 import { navegar, usarRuta } from './navegacion';
 
 export default function AppRoutes({ usuario, onIniciarSesion, onCerrarSesion }) {
   const ruta = usarRuta();
   const roles = usuario?.roles ?? [];
+  const modoCoordinador = esCoordinador(roles);
+  const soloMiEmpresa = esRepresentanteRestringido(roles);
   const modulos = modulosPermitidos(roles);
   const destino = primeraRutaPermitida(roles);
   const sinSesion = !usuario;
@@ -69,13 +78,25 @@ export default function AppRoutes({ usuario, onIniciarSesion, onCerrarSesion }) 
   } else if (ruta === '/admin/tipos-practica') {
     pagina = <TiposPractica />;
   } else if (ruta === '/estudiantes') {
-    pagina = <Estudiantes />;
+    pagina = <Estudiantes modoCoordinador={modoCoordinador} usuarioId={usuario.id} />;
   } else if (ruta === '/docentes') {
     pagina = <Docentes />;
   } else if (ruta === '/empresas') {
-    pagina = <Empresas />;
+    pagina = (
+      <Empresas
+        puedeCrearEmpresa={puedeCrearEmpresa(roles)}
+        usuarioId={usuario.id}
+        soloMiEmpresa={soloMiEmpresa}
+      />
+    );
   } else if (/^\/empresas\/\d+$/.test(ruta)) {
-    pagina = <DetalleEmpresa id={ruta.split('/').pop()} />;
+    pagina = (
+      <DetalleEmpresa
+        id={ruta.split('/').pop()}
+        usuarioId={usuario.id}
+        soloMiEmpresa={soloMiEmpresa}
+      />
+    );
   } else {
     pagina = <MensajeEstado tipo="error" mensaje="Página no encontrada." />;
   }

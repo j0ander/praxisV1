@@ -38,3 +38,10 @@ export function asignarRoles(id, roles) {
 export function asignarCarreras(id, carreraIds) {
   return solicitar(`/usuarios/${id}/carreras`, { metodo: 'PUT', cuerpo: { carreraIds } });
 }
+
+export function asignarCarreraCoordinador(id, carreraId) {
+  return solicitar(`/usuarios/${id}/coordinador-carrera`, {
+    metodo: 'PUT',
+    cuerpo: { carreraId },
+  });
+}

@@ -37,6 +37,7 @@ export default function DatosEmpresa({ empresa, puedeEditar = true, onGuardada }
 
   async function guardar(evento) {
     evento.preventDefault();
+    if (!puedeEditar) return;
     const errores = validarDatosEmpresa(formulario);
     setErroresCampos(errores);
     if (Object.keys(errores).length > 0) return;

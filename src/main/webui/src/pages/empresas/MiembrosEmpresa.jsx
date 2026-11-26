@@ -43,6 +43,7 @@ export default function MiembrosEmpresa({ empresaId, puedeGestionar = true }) {
   }
 
   function abrirCrear() {
+    if (!puedeGestionar) return;
     setResultado(null);
     setError(null);
     setErroresCampos({});
@@ -51,6 +52,7 @@ export default function MiembrosEmpresa({ empresaId, puedeGestionar = true }) {
   }
 
   function abrirEditar(miembro) {
+    if (!puedeGestionar) return;
     setResultado(null);
     setError(null);
     setErroresCampos({});
@@ -79,6 +81,7 @@ export default function MiembrosEmpresa({ empresaId, puedeGestionar = true }) {
 
   async function guardar(evento) {
     evento.preventDefault();
+    if (!puedeGestionar) return;
     const errores = validar();
     setErroresCampos(errores);
     if (Object.keys(errores).length > 0) return;

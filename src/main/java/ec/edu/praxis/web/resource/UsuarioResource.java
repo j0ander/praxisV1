@@ -109,6 +109,15 @@ public class UsuarioResource {
         return Response.ok().build();
     }
 
+    @PUT
+    @Path("/{id}/coordinador-carrera")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response asignarCarreraCoordinador(@PathParam("id") Long id,
+            AsignarCoordinadorCarreraRequest solicitud) {
+        service.asignarCarreraCoordinador(id, solicitud == null ? null : solicitud.carreraId);
+        return Response.ok().build();
+    }
+
     private UsuarioResumen resumen(Usuario usuario) {
         return new UsuarioResumen(usuario, service.rolesDe(usuario.getId()),
                 service.carrerasDe(usuario.getId()));
@@ -308,6 +317,19 @@ public class UsuarioResource {
 
         public void setCarreraIds(List<Long> carreraIds) {
             this.carreraIds = carreraIds;
+        }
+    }
+
+    public static class AsignarCoordinadorCarreraRequest {
+
+        private Long carreraId;
+
+        public Long getCarreraId() {
+            return carreraId;
+        }
+
+        public void setCarreraId(Long carreraId) {
+            this.carreraId = carreraId;
         }
     }
 

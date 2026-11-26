@@ -26,8 +26,16 @@ public class EstudianteService {
     @Inject
     CarreraRepository carreraRepository;
 
+    @Inject
+    UsuarioService usuarioService;
+
     public List<Estudiante> listar(Long carreraFiltro) {
         return carreraFiltro == null ? repository.listAll() : repository.listarPorCarrera(carreraFiltro);
+    }
+
+    public List<Estudiante> listarPorCoordinador(Long coordinadorId) {
+        Long carreraId = usuarioService.carreraDeCoordinador(coordinadorId);
+        return repository.listarPorCarrera(carreraId);
     }
 
     public Estudiante buscar(Long id) {

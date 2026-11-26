@@ -11,6 +11,7 @@ import {
   crearEstudiante,
   actualizarEstudiante,
   listarEstudiantes,
+  listarEstudiantesPorCoordinador,
 } from '../../services/perfilService';
 import { listarUsuarios } from '../../services/usuarioService';
 
@@ -21,7 +22,7 @@ const PERFIL_VACIO = {
   fechaNacimiento: '',
 };
 
-export default function Estudiantes() {
+export default function Estudiantes({ modoCoordinador = false, usuarioId }) {
   const [carreras, setCarreras] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [cargandoUsuarios, setCargandoUsuarios] = useState(false);
@@ -36,10 +37,11 @@ export default function Estudiantes() {
   const [resultado, setResultado] = useState(null);
 
   useEffect(() => {
+    if (modoCoordinador) return;
     listarCarreras()
       .then((datos) => setCarreras(Array.isArray(datos) ? datos : []))
       .catch((fallo) => setError(mensajeDeError(fallo)));
-  }, []);
+  }, [modoCoordinador]);
 
   const cargarUsuarios = useCallback(() => {
     setCargandoUsuarios(true);
@@ -54,17 +56,21 @@ export default function Estudiantes() {
   }, []);
 
   useEffect(() => {
+    if (modoCoordinador) return;
     cargarUsuarios();
-  }, [cargarUsuarios]);
+  }, [cargarUsuarios, modoCoordinador]);
 
   const cargar = useCallback(() => {
     setCargando(true);
     setError(null);
-    listarEstudiantes(filtroCarrera)
+    const peticion = modoCoordinador
+      ? listarEstudiantesPorCoordinador(usuarioId)
+      : listarEstudiantes(filtroCarrera);
+    peticion
       .then((datos) => setEstudiantes(Array.isArray(datos) ? datos : []))
       .catch((fallo) => setError(mensajeDeError(fallo)))
       .finally(() => setCargando(false));
-  }, [filtroCarrera]);
+  }, [modoCoordinador, usuarioId, filtroCarrera]);
 
   useEffect(() => {
     cargar();
@@ -129,7 +135,7 @@ export default function Estudiantes() {
     }
   }
 
-  const columnas = [
+  const columnasBase = [
     {
       clave: 'codigoEstudiante',
       titulo: 'Código',
@@ -150,16 +156,21 @@ export default function Estudiantes() {
       titulo: 'Usuario',
       render: (item) => item.usuarioId,
     },
-    {
-      clave: 'acciones',
-      titulo: 'Acciones',
-      render: (item) => (
-        <Boton variante="enlace" pequeno onClick={() => abrirPerfil(item)}>
-          Ver / Editar
-        </Boton>
-      ),
-    },
   ];
+  const columnas = modoCoordinador
+    ? columnasBase
+    : [
+        ...columnasBase,
+        {
+          clave: 'acciones',
+          titulo: 'Acciones',
+          render: (item) => (
+            <Boton variante="enlace" pequeno onClick={() => abrirPerfil(item)}>
+              Ver / Editar
+            </Boton>
+          ),
+        },
+      ];
 
   const esEdicion = Boolean(perfil?.id);
 
@@ -167,16 +178,20 @@ export default function Estudiantes() {
     <>
       <div className="tarjeta__cabecera">
         <div>
-          <h1>Estudiantes</h1>
-          <p>Gestión de perfiles académicos de estudiantes.</p>
+          <h1>{modoCoordinador ? 'Estudiantes de mi carrera' : 'Estudiantes'}</h1>
+          <p>
+            {modoCoordinador
+              ? 'Consulta de estudiantes de la carrera asignada al coordinador.'
+              : 'Gestión de perfiles académicos de estudiantes.'}
+          </p>
         </div>
-        <Boton onClick={() => abrirPerfil(null)}>Nuevo perfil</Boton>
+        {!modoCoordinador ? <Boton onClick={() => abrirPerfil(null)}>Nuevo perfil</Boton> : null}
       </div>
 
       <MensajeEstado tipo={resultado?.tipo} mensaje={resultado?.mensaje} />
       {!perfil ? <MensajeEstado tipo="error" mensaje={error} onReintentar={cargar} /> : null}
 
-      {perfil ? (
+      {!modoCoordinador && perfil ? (
         <section className="tarjeta">
           <h2>{esEdicion ? 'Editar perfil' : 'Nuevo perfil de estudiante'}</h2>
           <form onSubmit={guardar}>
@@ -260,25 +275,27 @@ export default function Estudiantes() {
         </section>
       ) : null}
 
-      <section className="tarjeta">
-        <h2>Búsqueda</h2>
-        <div className="rejilla">
-          <CampoFormulario id="filtro-carrera" etiqueta="Carrera">
-            <select
-              id="filtro-carrera"
-              value={filtroCarrera}
-              onChange={(evento) => setFiltroCarrera(evento.target.value)}
-            >
-              <option value="">Todas las carreras</option>
-              {carreras.map((carrera) => (
-                <option key={carrera.id} value={carrera.id}>
-                  {carrera.nombre} ({carrera.codigo})
-                </option>
-              ))}
-            </select>
-          </CampoFormulario>
-        </div>
-      </section>
+      {!modoCoordinador ? (
+        <section className="tarjeta">
+          <h2>Búsqueda</h2>
+          <div className="rejilla">
+            <CampoFormulario id="filtro-carrera" etiqueta="Carrera">
+              <select
+                id="filtro-carrera"
+                value={filtroCarrera}
+                onChange={(evento) => setFiltroCarrera(evento.target.value)}
+              >
+                <option value="">Todas las carreras</option>
+                {carreras.map((carrera) => (
+                  <option key={carrera.id} value={carrera.id}>
+                    {carrera.nombre} ({carrera.codigo})
+                  </option>
+                ))}
+              </select>
+            </CampoFormulario>
+          </div>
+        </section>
+      ) : null}
 
       <section className="tarjeta">
         <h2>Perfiles registrados</h2>
@@ -287,7 +304,9 @@ export default function Estudiantes() {
           filas={estudiantes}
           cargando={cargando}
           error={null}
-          vacio="No se encontraron perfiles de estudiante."
+          vacio={modoCoordinador
+            ? 'No se encontraron estudiantes de la carrera asignada.'
+            : 'No se encontraron perfiles de estudiante.'}
         />
       </section>
     </>

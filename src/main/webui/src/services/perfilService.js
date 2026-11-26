@@ -4,6 +4,10 @@ export function listarEstudiantes(carreraId) {
   return solicitar('/estudiantes/listarTodos', { parametros: { carreraId } });
 }
 
+export function listarEstudiantesPorCoordinador(coordinadorId) {
+  return solicitar(`/estudiantes/listarPorCoordinador/${coordinadorId}`);
+}
+
 export function buscarEstudiante(id) {
   return solicitar(`/estudiantes/buscar/${id}`);
 }
