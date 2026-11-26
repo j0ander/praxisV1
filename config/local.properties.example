@@ -1,15 +1,3 @@
-# Plantilla para config/local.properties (no versionar el archivo real).
-# Copia este archivo como config/local.properties y completa solo los tres valores.
-#
-# En Supabase: Project Settings > Database > Connection string > Session pooler.
-# Usa el puerto 5432 y anade sslmode=require si la cadena no lo incluye.
-# El usuario tiene el formato postgres.<referencia-del-proyecto>.
-#
-# No uses el host directo db.<referencia>.supabase.com, PostgreSQL local,
-# .env ni variables de entorno para esta conexion.
-# El esquema ya existe: no ejecutes V1-V4 ni modifiques tablas, datos,
-# triggers, vistas ni migraciones durante la configuracion.
-
 quarkus.datasource.jdbc.url=jdbc:postgresql://aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
 quarkus.datasource.username=postgres.<referencia-del-proyecto>
 quarkus.datasource.password=<contrasena-del-proyecto>

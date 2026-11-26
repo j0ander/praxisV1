@@ -6,7 +6,6 @@ import ec.edu.praxis.domain.model.Empresa;
 import ec.edu.praxis.domain.model.TutorEmpresarial;
 import ec.edu.praxis.domain.model.Usuario;
 import ec.edu.praxis.infrastructure.repository.EmpresaRepository;
-import ec.edu.praxis.infrastructure.repository.EmpresaUsuarioRepository;
 import ec.edu.praxis.infrastructure.repository.TutorEmpresarialRepository;
 import ec.edu.praxis.infrastructure.repository.UsuarioRepository;
 import ec.edu.praxis.infrastructure.repository.UsuarioRolRepository;
@@ -14,7 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
-/** Tutores empresariales: API-051 a API-053. */
+
 @ApplicationScoped
 public class TutorEmpresarialService {
 
@@ -27,18 +26,13 @@ public class TutorEmpresarialService {
     EmpresaRepository empresaRepository;
 
     @Inject
-    EmpresaUsuarioRepository empresaUsuarioRepository;
-
-    @Inject
     UsuarioRepository usuarioRepository;
 
     @Inject
     UsuarioRolRepository usuarioRolRepository;
 
-    public List<TutorEmpresarial> listar(Long empresaId, Long actorId, boolean esInstitucional,
-            boolean esRepresentante) {
+    public List<TutorEmpresarial> listar(Long empresaId) {
         obtenerEmpresa(empresaId);
-        verificarAmbito(empresaId, actorId, esInstitucional, esRepresentante);
         return repository.listarPorEmpresa(empresaId);
     }
 
@@ -58,7 +52,7 @@ public class TutorEmpresarialService {
         if (!usuario.isActivo()
                 || !usuarioRolRepository.listarCodigosPorUsuario(usuario.getId()).contains(ROL_TUTOR)) {
             throw ApiException.reglaNegocio(
-                    "El usuario debe estar activo y tener el rol TUTOR_EMPRESARIAL.");
+        "El usuario debe estar activo y tener el rol TUTOR_EMPRESARIAL.");
         }
         if (repository.existePorUsuario(usuario.getId())) {
             throw ApiException.duplicado("El usuario ya es tutor de otra empresa.");
@@ -94,20 +88,6 @@ public class TutorEmpresarialService {
         return empresa;
     }
 
-    /** En la consulta de tutores basta con una membresía efectiva, sin exigir ADMIN_EMPRESA. */
-    private void verificarAmbito(Long empresaId, Long actorId, boolean esInstitucional,
-            boolean esRepresentante) {
-        if (esInstitucional) {
-            return;
-        }
-        if (esRepresentante && actorId != null
-                && empresaUsuarioRepository.rolActivo(empresaId, actorId) != null) {
-            return;
-        }
-        throw ApiException.noEncontrado("Empresa no encontrada.");
-    }
-
-    /** API-052 rechaza el id; API-053 lo exige como identificador del tutor. */
     private static void validarCamposInternos(TutorEmpresarial datos, boolean permiteId) {
         if (datos == null) {
             throw ApiException.datosInvalidos("Los datos del tutor son obligatorios.");

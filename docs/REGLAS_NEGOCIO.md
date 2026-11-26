@@ -3,7 +3,7 @@
 ## 1. Introducción
 
 Define las condiciones que PRAXIS debe respetar al ejecutar sus operaciones, las restricciones de cada proceso y los resultados esperados.
-Cubre: usuarios y accesos, gestión académica, empresas y convenios, ofertas, postulaciones, formalización de prácticas, ejecución y seguimiento, evaluación y certificación, y trazabilidad. No incluye bolsas de empleo externas ni procesos de titulación ajenos a las prácticas.
+Cubre: usuarios (roles y carreras como datos de dominio; login básico de prototipo sin autorización en la API), gestión académica, empresas y convenios, ofertas, postulaciones, formalización de prácticas, ejecución y seguimiento, evaluación y certificación, y trazabilidad. No incluye bolsas de empleo externas ni procesos de titulación ajenos a las prácticas.
 
 ## 2. Reglas generales
 
@@ -13,17 +13,17 @@ Condición: El correo (en minúsculas y con formato válido) y el número de doc
 Resultado: La cuenta se registra.
 Si no se cumple: Se rechaza el registro indicando el dato duplicado o inválido.
 
-### RN-002 - Acceso según estado de la cuenta
-Descripción: El acceso depende del estado de la cuenta y de las credenciales.
-Condición: La cuenta debe estar activa, no bloqueada (`bloqueado_hasta` vencido o vacío) y las credenciales deben ser válidas. La contraseña se guarda cifrada, nunca se muestra ni se recupera (solo se actualiza o restablece) y `debe_cambiar_password` obliga a cambiarla al ingresar.
-Resultado: El usuario accede a las funciones autorizadas.
-Si no se cumple: Se deniega el acceso; los intentos fallidos se acumulan hasta el bloqueo temporal.
+### RN-002 - Contraseña cifrada (no vigente en acceso, intentos y bloqueo)
+Descripción: La contraseña se guarda cifrada con BCrypt al crear o actualizar la cuenta; nunca se muestra ni se recupera. No hay inicio de sesión, comparación de credenciales, cambio obligatorio, intentos fallidos ni bloqueo de cuentas: esas funciones están pendientes a futuro (`SEGURIDAD.md`).
+Condición: La contraseña recibida se transforma en hash BCrypt antes de persistirse. Las columnas `intentos_fallidos`, `bloqueado_hasta`, `ultimo_login` y `debe_cambiar_password` permanecen en la base, pero la aplicación no las usa.
+Resultado: El hash queda registrado; no se devuelve la contraseña en texto plano.
+Si no se cumple: Se rechaza la operación por dato inválido. No existe denegación de acceso por credenciales.
 
-### RN-003 - Operaciones según rol
-Descripción: Cada operación corresponde a un rol activo: `ESTUDIANTE`, `DOCENTE`, `TUTOR_EMPRESARIAL`, `COORDINADOR`, `ADMINISTRADOR`, `AUTORIDAD` (solo lectura) y `REPRESENTANTE_EMPRESA`.
-Condición: El usuario debe estar activo y tener el rol requerido por la operación. Su ámbito institucional (carreras en `usuario_carrera`, o `alcance_global`) limita la información que gestiona; lo aplica la API.
-Resultado: La operación se ejecuta dentro del ámbito autorizado.
-Si no se cumple: Se rechaza la operación. La base de datos actúa como segunda barrera; la API debe autorizar siempre.
+### RN-003 - Roles como datos de dominio (sin autorización; no vigente como regla de acceso)
+Descripción: Los códigos `ESTUDIANTE`, `DOCENTE`, `TUTOR_EMPRESARIAL`, `COORDINADOR`, `ADMINISTRADOR`, `AUTORIDAD` y `REPRESENTANTE_EMPRESA` se conservan en `rol` y `usuario_rol` como datos de dominio. No determinan operaciones permitidas ni ámbitos de acceso.
+Condición: Se valida la existencia de los registros referenciados y las reglas de negocio de cada operación. `usuario_carrera` y `alcance_global` son datos de dominio, no filtros de autorización.
+Resultado: La operación se ejecuta conforme a las reglas académicas y de negocio vigentes.
+Si no se cumple: Se rechaza por inexistencia o incumplimiento de una regla. No se emiten 401 ni 403 por rol o ámbito; la base actúa como segunda barrera de integridad.
 
 ### RN-004 - Perfiles académicos vinculados a la cuenta
 Descripción: Estudiantes y docentes tienen un único perfil asociado a su usuario.
@@ -59,7 +59,7 @@ Si no se cumple: Se rechaza el registro.
 
 ### RN-009 - Usuarios y tutores de la empresa
 Descripción: Los tutores empresariales pertenecen a una sola empresa. Los usuarios que publican ofertas se vinculan a la empresa como `ADMIN_EMPRESA` o `PUBLICADOR`.
-Condición: La empresa debe existir y estar activa. El miembro debe estar activo y tener el rol `REPRESENTANTE_EMPRESA`. El primer miembro activo debe ser `ADMIN_EMPRESA` y la empresa no puede quedar sin uno. Solo coordinador, administrador o `ADMIN_EMPRESA` gestionan miembros.
+Condición: La empresa debe existir y estar activa. El miembro debe estar activo y tener el rol `REPRESENTANTE_EMPRESA` como dato de dominio. El primer miembro activo debe ser `ADMIN_EMPRESA` y la empresa no puede quedar sin uno. La gestión de miembros no está restringida por rol ni por actor autenticado.
 Resultado: El usuario queda vinculado y puede operar dentro de su empresa.
 Si no se cumple: Se rechaza la vinculación. Los miembros no se eliminan; se desactivan.
 
@@ -70,8 +70,8 @@ Resultado: El convenio puede usarse en ofertas y prácticas.
 Si no se cumple: Se impide su uso o registro.
 
 ### RN-011 - Creación de ofertas
-Descripción: Solo la empresa autorizada crea ofertas.
-Condición: La empresa debe estar activa y el creador debe ser miembro activo de ella (usuario autenticado).
+Descripción: La empresa titular crea ofertas.
+Condición: La empresa debe estar activa y existir como titular de la oferta. No se comprueba un usuario autenticado ni un actor de sesión.
 Resultado: La oferta se registra.
 Si no se cumple: Se impide la creación.
 
@@ -89,43 +89,43 @@ Si no se cumple: Se rechaza el cambio. Un perfil con postulaciones no se elimina
 
 ### RN-014 - Aprobación previa por coordinación
 Descripción: La empresa propone; la coordinación aprueba o rechaza antes de publicar.
-Condición: La oferta debe estar en `PENDIENTE_REVISION`. Solo un `COORDINADOR` activo la aprueba o rechaza; el rechazo exige motivo.
+Condición: La oferta debe estar en `PENDIENTE_REVISION`. La aprobación o el rechazo se registran como operación de coordinación institucional, sin verificación de rol de acceso; el rechazo exige motivo.
 Resultado: `PUBLICADA` (visible para estudiantes) o `RECHAZADA` con observaciones conservadas.
 Si no se cumple: Una oferta no aprobada no se muestra ni recibe postulaciones.
 
 ### RN-015 - Modificación de ofertas publicadas
 Descripción: Un cambio sustancial (título, descripción, tipo, periodo, convenio, fechas, perfiles, carreras o requisitos) exige nueva revisión.
-Condición: Edita la empresa autorizada (`ADMIN_EMPRESA` o el `PUBLICADOR` creador). El tipo de práctica no cambia si ya hay postulaciones.
+Condición: La edición se asocia a la empresa titular de la oferta; `ADMIN_EMPRESA` y `PUBLICADOR` son datos de dominio, no permisos. El tipo de práctica no cambia si ya hay postulaciones.
 Resultado: La oferta publicada vuelve a `PENDIENTE_REVISION`, deja de recibir postulaciones y el cambio queda registrado.
 Si no se cumple: Se rechaza la edición. Las ofertas `CERRADA` o `CANCELADA` no se editan.
 
 ### RN-016 - Disponibilidad, cierre y cancelación de ofertas
 Descripción: Solo las ofertas vigentes se muestran como oportunidades.
-Condición: La oferta debe estar `PUBLICADA` y dentro de su fecha de cierre. Se cierra (`CERRADA`) automáticamente al vencer el plazo o al cubrirse todas las plazas, o por un coordinador. Se cancela (`CANCELADA`, con motivo) por un coordinador o el `ADMIN_EMPRESA`.
+Condición: La oferta debe estar `PUBLICADA` y dentro de su fecha de cierre. Se cierra (`CERRADA`) automáticamente al vencer el plazo o al cubrirse todas las plazas, o por operación institucional. Se cancela (`CANCELADA`, con motivo) por operación institucional; `COORDINADOR` y `ADMIN_EMPRESA` son datos de dominio, no permisos.
 Resultado: La oferta deja de aceptar postulaciones al cerrarse o cancelarse.
 Si no se cumple: Se excluye de las ofertas disponibles. Las ofertas no se eliminan.
 
 ### RN-017 - Condiciones para postularse
 Descripción: El estudiante se postula a un perfil de una oferta.
-Condición: Postula el propio estudiante autenticado; oferta `PUBLICADA` y dentro del plazo; convenio vigente; empresa, tipo y periodo habilitados; carrera activa del estudiante incluida en el perfil; perfil con plazas disponibles.
+Condición: Postula un estudiante existente, sin usuario autenticado ni actor de sesión; oferta `PUBLICADA` y dentro del plazo; convenio vigente; empresa, tipo y periodo habilitados; carrera activa del estudiante incluida en el perfil; perfil con plazas disponibles.
 Resultado: La postulación se registra como `PENDIENTE`.
 Si no se cumple: Se rechaza indicando la causa.
 
 ### RN-018 - Decisión de coordinación y plazas
 Descripción: Solo la coordinación acepta o rechaza postulaciones. La plaza se ocupa al aceptar.
-Condición: Para aceptar: coordinador activo, oferta `PUBLICADA` o `CERRADA`, convenio vigente, empresa, tipo y periodo habilitados, plaza disponible y estudiante sin otra práctica vigente en el periodo. La disponibilidad de la plaza se comprueba y se reserva dentro de la misma transacción; `postulacion` usa control optimista (`@Version`). Rechazar exige motivo.
+Condición: Para aceptar: oferta `PUBLICADA` o `CERRADA`, convenio vigente, empresa, tipo y periodo habilitados, plaza disponible y estudiante sin otra práctica vigente en el periodo. La decisión se registra como operación de coordinación institucional, sin verificación de rol de acceso. La disponibilidad de la plaza se comprueba y se reserva dentro de la misma transacción; `postulacion` usa control optimista (`@Version`). Rechazar exige motivo.
 Resultado: `ACEPTADA` (ocupa plaza y genera la práctica en la misma transacción) o `RECHAZADA`. Si otra operación cambió el registro o agotó la plaza, la respuesta es 409 `CONFLICTO_CONCURRENCIA`.
-Si no se cumple: Se rechaza la decisión. Una decisión ya tomada solo se corrige por operación administrativa de coordinador de ámbito o administrador, con motivo y auditoría, sin cambiar el estado de la postulación (CR-4; RN-039, `MODELO_DATOS.md` §7.3).
+Si no se cumple: Se rechaza la decisión. Una decisión ya tomada solo se corrige mediante operación de corrección con motivo y auditoría, sin control por rol o ámbito y sin cambiar el estado de la postulación (CR-4; RN-039, `MODELO_DATOS.md` §7.3).
 
 ### RN-019 - Retiro y cancelación de postulaciones
 Descripción: El estudiante retira su postulación pendiente; el coordinador cancela una aceptada.
-Condición: Retira solo el estudiante propietario. Cancela un coordinador activo, con motivo, y solo si la práctica asociada está `CANCELADA` o `RECHAZADA`.
+Condición: El retiro y la cancelación se rigen por el estado de la postulación y de la práctica; no se comprueba propiedad ni rol de un usuario autenticado. Cancelar exige motivo y solo procede si la práctica asociada está `CANCELADA` o `RECHAZADA`.
 Resultado: `RETIRADA` permite repostular; `CANCELADA` libera la plaza.
 Si no se cumple: Se rechaza la operación.
 
 ### RN-020 - Formalización de la práctica
 Descripción: Aceptar una postulación genera la práctica en la misma operación.
-Condición: La práctica se crea en estado `APROBADA` con fecha de aprobación, creada por el coordinador autenticado. Debe coincidir con la oferta (estudiante, empresa, convenio, tipo, periodo, horas y nota mínima) y con la carrera actual del estudiante. No exige docente ni tutor: se asignan antes de iniciar. La aceptación de la postulación y la creación de la práctica se ejecutan en una única transacción; `practica` también usa `@Version`. Los errores de los triggers diferidos se traducen a 409 al confirmar la transacción.
+Condición: La práctica se crea en estado `APROBADA` con fecha de aprobación, sin actor de sesión. Debe coincidir con la oferta (estudiante, empresa, convenio, tipo, periodo, horas y nota mínima) y con la carrera actual del estudiante. No exige docente ni tutor: se asignan antes de iniciar. La aceptación de la postulación y la creación de la práctica se ejecutan en una única transacción; `practica` también usa `@Version`. Los errores de los triggers diferidos se traducen a 409 al confirmar la transacción.
 Resultado: Quedan vinculados estudiante, empresa, convenio, tipo de práctica y periodo; la plaza queda ocupada de forma definitiva solo si se confirma la transacción.
 Si no se cumple: No se confirma la aceptación; una postulación `ACEPTADA` no puede quedar sin práctica.
 
@@ -222,19 +222,19 @@ Resultado: Se informa la autenticidad y el estado (`VIGENTE` o `ANULADO`).
 Si no se cumple: Se informa que no puede verificarse.
 
 ### RN-038 - Anulación de certificados
-Descripción: Un coordinador autorizado puede anular un certificado.
+Descripción: La anulación de un certificado se registra como operación institucional, sin verificación de rol de acceso.
 Condición: Se registran motivo, fecha y responsable. El certificado no se elimina ni se modifican sus datos congelados.
 Resultado: El certificado queda `ANULADO`, de forma definitiva.
 Si no se cumple: Se rechaza la anulación o cualquier cambio posterior.
 
 ### RN-039 - Registro de operaciones relevantes
 Descripción: Las operaciones relevantes dejan evidencia inmutable e identifican al responsable.
-Condición: Se registran en auditoría o historial las transiciones de postulaciones, cambios de estado de ofertas y prácticas, cambios de cabecera de ofertas, cambios de membresía empresarial y correcciones administrativas. Toda operación auditable exige usuario autenticado, salvo procesos del sistema (cierre automático de ofertas).
-Resultado: El evento queda disponible para actores autorizados.
+Condición: Se registran en auditoría o historial las transiciones de postulaciones, cambios de estado de ofertas y prácticas, cambios de cabecera de ofertas, cambios de membresía empresarial y correcciones administrativas. La aplicación ya no fija el contexto de actor (`CONTEXTO_ACTOR.md`); los triggers que lo requieran pueden rechazar la escritura, sin inventar un usuario ni desactivar validaciones.
+Resultado: El evento queda disponible para consulta institucional.
 Si no se cumple: La operación no se completa. Los historiales y la auditoría no se modifican.
 
 ### RN-040 - Consistencia de reportes
-Descripción: Los reportes se generan solo a partir de registros existentes; `AUTORIDAD` tiene acceso de solo lectura.
+Descripción: Los reportes se generan solo a partir de registros existentes y son de consulta; no hay acceso por rol. `AUTORIDAD` se conserva como dato de dominio.
 Condición: Los datos deben conservar sus relaciones con estudiantes, empresas, prácticas y periodos.
 Resultado: Los indicadores reflejan la información institucional.
 Si no se cumple: No se presenta información inexistente o inconsistente.
@@ -250,16 +250,14 @@ Si no se cumple: No se presenta información inexistente o inconsistente.
 
 ### 4.1. Cuenta de usuario
 
-Representación: `usuario.activo`, `usuario.bloqueado_hasta`, `usuario.intentos_fallidos` (no hay columna de estado).
+Representación vigente: `usuario.activo` como dato de dominio (no hay columna de estado). Las columnas `bloqueado_hasta`, `intentos_fallidos`, `ultimo_login` y `debe_cambiar_password` permanecen en la base, pero la aplicación no las usa.
 Estado inicial: Activa.
-Estados posibles: Activa, Bloqueada, Desactivada.
+Estados posibles: Activa, Desactivada. No hay estado `Bloqueada` vigente.
 
 | Estado inicial | Evento | Estado final | Condición |
 |---|---|---|---|
-| Activa | Intentos fallidos superan el límite | Bloqueada | Límite configurable, sin valor fijo en el código (CR-3). |
-| Bloqueada | Vence `bloqueado_hasta` | Activa | Se cumple el tiempo de bloqueo. |
-| Activa o Bloqueada | Desactivar cuenta | Desactivada | Operación del administrador. |
-| Desactivada | Reactivar cuenta | Activa | Operación del administrador. |
+| Activa | Desactivar cuenta | Desactivada | Operación de administración de usuarios, sin control de acceso por rol. |
+| Desactivada | Reactivar cuenta | Activa | Operación de administración de usuarios, sin control de acceso por rol. |
 
 ### 4.2. Periodo académico
 
@@ -270,7 +268,7 @@ Estados posibles: No activo, Activo.
 | Estado inicial | Evento | Estado final | Condición |
 |---|---|---|---|
 | No activo | Activar | Activo | No existe otro periodo activo. |
-| Activo | Desactivar | No activo | Operación autorizada. |
+| Activo | Desactivar | No activo | Operación sujeta a reglas de negocio. |
 
 ### 4.3. Convenio
 
@@ -280,8 +278,8 @@ Estado inicial: `VIGENTE`.
 | Estado inicial | Evento | Estado final | Condición |
 |---|---|---|---|
 | `VIGENTE` | Pasa `fecha_fin` | `VENCIDO` (derivado) | Fecha de fin anterior a hoy (zona Ecuador). |
-| `VIGENTE` | Suspender | `SUSPENDIDO` | Operación autorizada. |
-| `VIGENTE` o `SUSPENDIDO` | Terminar | `TERMINADO` | Operación autorizada. |
+| `VIGENTE` | Suspender | `SUSPENDIDO` | Operación sujeta a reglas de negocio. |
+| `VIGENTE` o `SUSPENDIDO` | Terminar | `TERMINADO` | Operación sujeta a reglas de negocio. |
 
 La base de datos no restringe estas transiciones manuales. Solo el estado efectivo `VIGENTE` habilita el uso del convenio.
 
@@ -304,13 +302,13 @@ Estados posibles: `BORRADOR`, `PENDIENTE_REVISION`, `PUBLICADA`, `RECHAZADA`, `C
 
 | Estado inicial | Evento | Estado final | Condición |
 |---|---|---|---|
-| `BORRADOR` | Enviar a revisión | `PENDIENTE_REVISION` | Empresa autorizada; cumple RN-012. |
+| `BORRADOR` | Enviar a revisión | `PENDIENTE_REVISION` | Empresa titular; cumple RN-012. |
 | `PENDIENTE_REVISION` | Aprobar | `PUBLICADA` | Coordinador activo; cumple RN-012. |
 | `PENDIENTE_REVISION` | Rechazar | `RECHAZADA` | Coordinador activo; con motivo. |
-| `PENDIENTE_REVISION` | Retirar | `BORRADOR` | Empresa autorizada. |
-| `RECHAZADA` | Corregir | `BORRADOR` | Empresa autorizada. |
-| `RECHAZADA` | Reenviar | `PENDIENTE_REVISION` | Empresa autorizada; cumple RN-012. |
-| `PUBLICADA` | Modificación sustancial | `PENDIENTE_REVISION` | Empresa autorizada. |
+| `PENDIENTE_REVISION` | Retirar | `BORRADOR` | Empresa titular. |
+| `RECHAZADA` | Corregir | `BORRADOR` | Empresa titular. |
+| `RECHAZADA` | Reenviar | `PENDIENTE_REVISION` | Empresa titular; cumple RN-012. |
+| `PUBLICADA` | Modificación sustancial | `PENDIENTE_REVISION` | Empresa titular. |
 | `PUBLICADA` | Plazo vencido o plazas cubiertas | `CERRADA` | Proceso del sistema o coordinador. |
 | `BORRADOR`, `PENDIENTE_REVISION`, `RECHAZADA` o `PUBLICADA` | Cancelar | `CANCELADA` | Coordinador o `ADMIN_EMPRESA`; con motivo. |
 
@@ -343,13 +341,13 @@ Estados posibles: `POSTULADA`, `APROBADA`, `EN_CURSO`, `HORAS_COMPLETAS`, `EVALU
 | Estado inicial | Evento | Estado final | Condición |
 |---|---|---|---|
 | `POSTULADA` | Aprobar | `APROBADA` | Se registra fecha de aprobación. |
-| `POSTULADA` | Rechazar | `RECHAZADA` | Operación autorizada. |
+| `POSTULADA` | Rechazar | `RECHAZADA` | Operación sujeta a reglas de negocio. |
 | `APROBADA` | Iniciar ejecución | `EN_CURSO` | Docente, tutor empresarial y fechas asignados. |
 | `EN_CURSO` | Completar horas | `HORAS_COMPLETAS` | Horas validadas alcanzan las requeridas (RN-029). |
 | `HORAS_COMPLETAS` | Registrar evaluaciones | `EVALUADA` | Existe `nota_final`. |
 | `EVALUADA` | Resultado satisfactorio | `FINALIZADA` | `nota_final` ≥ `nota_minima_snapshot`. |
 | `EVALUADA` | Resultado no satisfactorio | `REPROBADA` | `nota_final` < `nota_minima_snapshot`. |
-| Cualquier estado no terminal | Cancelar | `CANCELADA` | Operación autorizada. |
+| Cualquier estado no terminal | Cancelar | `CANCELADA` | Operación sujeta a reglas de negocio. |
 
 `FINALIZADA`, `REPROBADA`, `RECHAZADA` y `CANCELADA` son estados finales. En el MVP la práctica queda en `APROBADA` con responsables y fechas asignados; el paso a `EN_CURSO` y los estados posteriores son mejoras futuras (CR-8).
 
@@ -397,7 +395,7 @@ Estados posibles: `VIGENTE`, `ANULADO`.
 | Estado inicial | Evento | Estado final | Condición |
 |---|---|---|---|
 | (sin certificado) | Emitir | `VIGENTE` | Práctica `FINALIZADA`; sin otro certificado vigente. |
-| `VIGENTE` | Anular | `ANULADO` | Coordinador autorizado; motivo, fecha y responsable. |
+| `VIGENTE` | Anular | `ANULADO` | Operación de coordinación institucional; motivo, fecha y responsable como dato de dominio. |
 
 `ANULADO` es final.
 

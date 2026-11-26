@@ -5,8 +5,6 @@ import java.util.List;
 
 import ec.edu.praxis.application.service.FacultadService;
 import ec.edu.praxis.domain.model.Facultad;
-import io.quarkus.security.Authenticated;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -19,7 +17,6 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-@Authenticated
 @Path("/facultades")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -44,7 +41,6 @@ public class FacultadResource {
     }
 
     @POST
-    @RolesAllowed("ADMINISTRADOR")
     public Response crear(Facultad facultad) {
         return Response.status(Response.Status.CREATED)
                 .entity(new FacultadResponse(service.crear(facultad)))
@@ -52,20 +48,17 @@ public class FacultadResource {
     }
 
     @PUT
-    @RolesAllowed("ADMINISTRADOR")
     public Response actualizar(Facultad facultad) {
         return Response.ok(new FacultadResponse(service.actualizar(facultad))).build();
     }
 
     @DELETE
-    @RolesAllowed("ADMINISTRADOR")
     @Path("/eliminar/{id}")
     public Response eliminar(@PathParam("id") Long id) {
         service.eliminar(id);
         return Response.noContent().build();
     }
 
-    /** Estructura de salida: no se devuelve la entidad JPA directamente. */
     public static class FacultadResponse {
 
         private final Long id;

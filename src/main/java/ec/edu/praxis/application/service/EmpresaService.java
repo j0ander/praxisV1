@@ -4,69 +4,26 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import ec.edu.praxis.domain.model.Empresa;
-import ec.edu.praxis.domain.model.Usuario;
 import ec.edu.praxis.infrastructure.repository.EmpresaRepository;
-import ec.edu.praxis.infrastructure.repository.EmpresaUsuarioRepository;
-import ec.edu.praxis.infrastructure.repository.EmpresaUsuarioRepository.Administracion;
-import ec.edu.praxis.infrastructure.repository.UsuarioRepository;
-import ec.edu.praxis.infrastructure.repository.UsuarioRolRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
-/** Empresas: API-039 a API-042 y API-086. */
+
 @ApplicationScoped
 public class EmpresaService {
 
     private static final Pattern RUC_PATTERN = Pattern.compile("^\\d{13}$");
-    private static final String ROL_REPRESENTANTE = "REPRESENTANTE_EMPRESA";
 
     @Inject
     EmpresaRepository repository;
-
-    @Inject
-    EmpresaUsuarioRepository empresaUsuarioRepository;
-
-    @Inject
-    UsuarioRepository usuarioRepository;
-
-    @Inject
-    UsuarioRolRepository usuarioRolRepository;
 
     public List<Empresa> listar(String texto) {
         return repository.listarPorTexto(texto);
     }
 
-    public Empresa buscar(Long id, Long actorId, boolean esInstitucional, boolean esRepresentante) {
-        Empresa empresa = obtener(id);
-        verificarAmbito(empresa.getId(), actorId, esInstitucional, esRepresentante, false);
-        return empresa;
-    }
-
-    /** API-086: empresa del representante con membresía activa ADMIN_EMPRESA. */
-    public Empresa miEmpresa(Long usuarioId) {
-        if (usuarioId == null) {
-            throw ApiException.sinSesion("Se requiere sesión para consultar la empresa.");
-        }
-        Usuario usuario = usuarioRepository.findById(usuarioId);
-        if (usuario == null || !usuario.isActivo()
-                || !usuarioRolRepository.listarCodigosPorUsuario(usuarioId).contains(ROL_REPRESENTANTE)) {
-            throw ApiException.sinPermiso("El usuario no está autorizado para consultar su empresa.");
-        }
-
-        List<Administracion> administraciones = empresaUsuarioRepository.listarAdministracionesActivas(usuarioId);
-        if (administraciones.isEmpty()) {
-            throw ApiException.noEncontrado("No se encontró una empresa asociada con permisos ADMIN_EMPRESA.");
-        }
-        if (administraciones.size() > 1) {
-            throw ApiException.reglaNegocio("Existe más de una empresa asociada con permisos ADMIN_EMPRESA.");
-        }
-
-        Empresa empresa = repository.findById(administraciones.get(0).getEmpresaId());
-        if (empresa == null) {
-            throw ApiException.noEncontrado("No se encontró una empresa asociada con permisos ADMIN_EMPRESA.");
-        }
-        return empresa;
+    public Empresa buscar(Long id) {
+        return obtener(id);
     }
 
     @Transactional
@@ -81,13 +38,12 @@ public class EmpresaService {
     }
 
     @Transactional
-    public Empresa actualizar(Empresa datos, Long actorId, boolean esInstitucional, boolean esRepresentante) {
+    public Empresa actualizar(Empresa datos) {
         if (datos == null || datos.getId() == null) {
             throw ApiException.datosInvalidos("El id de la empresa es obligatorio.");
         }
         validarCamposInternos(datos, true);
         Empresa actual = obtener(datos.getId());
-        verificarAmbito(actual.getId(), actorId, esInstitucional, esRepresentante, true);
         validarRuc(datos.getRuc());
         validarActualizacion(datos);
         validarRucDuplicado(datos.getRuc(), actual.getId());
@@ -112,22 +68,6 @@ public class EmpresaService {
             throw ApiException.noEncontrado("Empresa no encontrada.");
         }
         return empresa;
-    }
-
-    private void verificarAmbito(Long empresaId, Long actorId, boolean esInstitucional,
-            boolean esRepresentante, boolean requiereAdmin) {
-        if (esInstitucional) {
-            return;
-        }
-        if (esRepresentante) {
-            boolean autorizado = requiereAdmin
-                    ? repository.esAdministradorDeUsuario(empresaId, actorId)
-                    : repository.perteneceAUsuario(empresaId, actorId);
-            if (autorizado) {
-                return;
-            }
-        }
-        throw ApiException.noEncontrado("Empresa no encontrada.");
     }
 
     static void validarRuc(String ruc) {

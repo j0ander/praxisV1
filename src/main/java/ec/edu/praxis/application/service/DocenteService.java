@@ -1,19 +1,14 @@
 package ec.edu.praxis.application.service;
 
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 import ec.edu.praxis.domain.model.Docente;
-import ec.edu.praxis.domain.model.Usuario;
 import ec.edu.praxis.infrastructure.repository.DocenteRepository;
-import ec.edu.praxis.infrastructure.repository.UsuarioCarreraRepository;
-import ec.edu.praxis.infrastructure.repository.UsuarioRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
-/** Perfiles de docente (API-037 y API-038) y creación automática desde API-031. */
+
 @ApplicationScoped
 public class DocenteService {
 
@@ -23,27 +18,10 @@ public class DocenteService {
     @Inject
     DocenteRepository repository;
 
-    @Inject
-    UsuarioRepository usuarioRepository;
-
-    @Inject
-    UsuarioCarreraRepository usuarioCarreraRepository;
-
-    public List<Docente> listar(Long actorId, boolean esAdmin) {
-        Set<Long> permitidas = carrerasPermitidas(actorId, esAdmin);
-        if (permitidas == null) {
-            return repository.listAll();
-        }
-        if (permitidas.isEmpty()) {
-            return List.of();
-        }
-        return repository.listarPorCarreras(permitidas);
+    public List<Docente> listar() {
+        return repository.listAll();
     }
 
-    /**
-     * Garantiza el perfil al asignar el rol DOCENTE. Se invoca dentro de la
-     * transacción de API-031; no crea un endpoint adicional ni usa V4 en runtime.
-     */
     public void crearPerfilPorRol(Long usuarioId) {
         if (usuarioId == null) {
             throw ApiException.datosInvalidos("El usuario es obligatorio.");
@@ -57,7 +35,7 @@ public class DocenteService {
     }
 
     @Transactional
-    public Docente actualizar(Long id, Docente datos, Long actorId, boolean esAdmin) {
+    public Docente actualizar(Long id, Docente datos) {
         if (id == null) {
             throw ApiException.datosInvalidos("El id del perfil de docente es obligatorio.");
         }
@@ -66,12 +44,6 @@ public class DocenteService {
             throw ApiException.noEncontrado("Perfil de docente no encontrado.");
         }
         validarDatos(datos);
-
-        Set<Long> permitidas = carrerasPermitidas(actorId, esAdmin);
-        Set<Long> objetivo = Set.copyOf(usuarioCarreraRepository.listarCarrerasPorUsuario(docente.getUsuarioId()));
-        if (!EstudianteService.dentroDeAmbito(permitidas, objetivo)) {
-            throw ApiException.noEncontrado("Perfil de docente no encontrado.");
-        }
 
         String codigo = datos.getCodigoDocente();
         if (codigo != null) {
@@ -85,21 +57,6 @@ public class DocenteService {
         docente.setDedicacion(datos.getDedicacion());
         repository.flush();
         return docente;
-    }
-
-    private Set<Long> carrerasPermitidas(Long actorId, boolean esAdmin) {
-        if (esAdmin) {
-            return null;
-        }
-        Usuario actor = usuarioRepository.findById(actorId);
-        if (actor == null) {
-            throw ApiException.noEncontrado("Usuario no encontrado.");
-        }
-        if (actor.isAlcanceGlobal()) {
-            return null;
-        }
-        Set<Long> carreras = new LinkedHashSet<>(usuarioCarreraRepository.listarCarrerasPorUsuario(actorId));
-        return carreras.isEmpty() ? Set.of() : carreras;
     }
 
     static void validarDatos(Docente datos) {

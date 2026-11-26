@@ -17,13 +17,12 @@ public class UsuarioCarreraRepository implements PanacheRepositoryBase<UsuarioCa
     public List<Long> listarCarrerasPorUsuario(Long usuarioId) {
         return em.createQuery(
                 "SELECT uc.id.carreraId FROM UsuarioCarrera uc "
-                        + "WHERE uc.id.usuarioId = :usuarioId ORDER BY uc.id.carreraId",
+        + "WHERE uc.id.usuarioId = :usuarioId ORDER BY uc.id.carreraId",
                 Long.class)
                 .setParameter("usuarioId", usuarioId)
                 .getResultList();
     }
 
-    /** Relaciones vigentes del usuario, para reemplazarlas gestionando entidades. */
     public List<UsuarioCarrera> listarPorUsuario(Long usuarioId) {
         return em.createQuery("SELECT uc FROM UsuarioCarrera uc WHERE uc.id.usuarioId = :usuarioId",
                 UsuarioCarrera.class)

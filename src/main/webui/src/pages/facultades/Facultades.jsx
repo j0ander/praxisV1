@@ -5,7 +5,6 @@ import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
 import Modal from '../../components/comunes/Modal';
 import Tabla from '../../components/comunes/Tabla';
-import { useSesion } from '../../contextos/SesionContexto';
 import { mensajeDeError } from '../../services/api';
 import {
   actualizarFacultad,
@@ -36,9 +35,6 @@ function validarFormulario(formulario) {
 }
 
 export default function Facultades() {
-  const { tieneRol } = useSesion();
-  const esAdmin = tieneRol('ADMINISTRADOR');
-
   const [facultades, setFacultades] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -177,24 +173,22 @@ export default function Facultades() {
     },
   ];
 
-  if (esAdmin) {
-    columnas.push({
-      clave: 'acciones',
-      titulo: 'Acciones',
-      render: (facultad) => (
-        <div className="acciones">
-          <Boton variante="enlace" pequeno onClick={() => abrirEditar(facultad)}>
-            Editar
+  columnas.push({
+    clave: 'acciones',
+    titulo: 'Acciones',
+    render: (facultad) => (
+      <div className="acciones">
+        <Boton variante="enlace" pequeno onClick={() => abrirEditar(facultad)}>
+          Editar
+        </Boton>
+        {facultad.activa ? (
+          <Boton variante="enlace" pequeno onClick={() => pedirDesactivacion(facultad)}>
+            Desactivar
           </Boton>
-          {facultad.activa ? (
-            <Boton variante="enlace" pequeno onClick={() => pedirDesactivacion(facultad)}>
-              Desactivar
-            </Boton>
-          ) : null}
-        </div>
-      ),
-    });
-  }
+        ) : null}
+      </div>
+    ),
+  });
 
   const tituloDialogo = dialogo?.modo === 'editar' ? 'Editar facultad' : 'Nueva facultad';
 
@@ -205,7 +199,7 @@ export default function Facultades() {
           <h1>Facultades</h1>
           <p>Consulte y administre las facultades de la institución.</p>
         </div>
-        {esAdmin ? <Boton onClick={abrirCrear}>Nueva facultad</Boton> : null}
+        <Boton onClick={abrirCrear}>Nueva facultad</Boton>
       </div>
 
       <MensajeEstado tipo={resultado?.tipo} mensaje={resultado?.mensaje} />

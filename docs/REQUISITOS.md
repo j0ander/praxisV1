@@ -17,25 +17,25 @@ Usuario registrado o actualizado, con el estado de cuenta reflejado.
 Prioridad:
 Alta.
 
-### RF-002 - Autenticación y asignación de roles
+### RF-002 - Asignación de roles (login básico; sin autorización)
 
 Descripción:
-El sistema debe autenticar usuarios por credenciales y asignarles roles, controlando el acceso según el rol y el ámbito institucional.
+El sistema registra roles y su relación con usuarios como **datos de dominio**. El login básico devuelve los roles para que React filtre menús y rutas; el control de acceso real según rol o ámbito institucional **no está vigente** y queda pendiente a futuro (`SEGURIDAD.md`).
 Actor:
-Usuario del sistema, administrador.
+Gestión de usuarios del sistema y usuario que ingresa al prototipo.
 Resultado esperado:
-Acceso solo a las funcionalidades correspondientes y roles registrados.
+Roles registrados y consultables como datos; el filtro de pantallas es visual y ninguna operación REST depende de una sesión ni de permisos por rol.
 Prioridad:
-Alta.
+Alta (como dato de dominio).
 
-### RF-003 - Seguridad de las cuentas
+### RF-003 - Seguridad de contraseñas (login básico; sin intentos ni bloqueo)
 
 Descripción:
-El sistema debe controlar intentos fallidos de ingreso, bloquear temporalmente la cuenta al superar el límite y permitir recuperar o actualizar contraseñas.
+El sistema genera el hash BCrypt al crear o restablecer contraseñas y lo compara con `BcryptUtil.matches` en el login básico. No hay intentos fallidos, bloqueo ni recuperación de contraseñas; esas funciones quedan pendientes a futuro (`SEGURIDAD.md`).
 Actor:
-Usuario del sistema, administrador.
+Gestión de usuarios del sistema y usuario que ingresa al prototipo.
 Resultado esperado:
-Intentos controlados, bloqueo al superar el límite y credenciales recuperables.
+Contraseñas almacenadas con BCrypt; nunca se muestran, se registran ni se devuelven en texto plano. El hash nunca se serializa ni se guarda en el navegador.
 Prioridad:
 Alta.
 
@@ -277,7 +277,7 @@ Media.
 Descripción:
 El sistema debe permitir emitir, consultar, descargar, verificar y anular certificados de finalización.
 Actor:
-Coordinador, estudiante, autoridad, usuario externo autorizado para verificar.
+Coordinador, estudiante, autoridad, usuario externo que verifica por código; sin control de acceso por rol.
 Resultado esperado:
 Certificado generado con código único, descargable y verificable; los anulados conservan su historial.
 Prioridad:
@@ -290,7 +290,7 @@ El sistema debe generar reportes e indicadores consolidados sobre la gestión de
 Actor:
 Coordinador, administrador, autoridad.
 Resultado esperado:
-Reportes consultables por los usuarios autorizados.
+Reportes consultables sin restricción por rol; fuera del MVP.
 Prioridad:
 Media.
 
@@ -301,7 +301,7 @@ El sistema debe registrar las operaciones relevantes para identificar qué acci�
 Actor:
 Sistema, administrador, coordinador.
 Resultado esperado:
-Eventos registrados con operación, usuario y momento, consultables por usuarios autorizados.
+Eventos registrados con operación, usuario y momento, consultables sin control de acceso por rol.
 Prioridad:
 Alta.
 
@@ -312,31 +312,31 @@ Alta.
 Categoría:
 Seguridad.
 Descripción:
-Las contraseñas no deben almacenarse ni mostrarse en texto plano en ningún componente del sistema.
+Las contraseñas no deben almacenarse ni mostrarse en texto plano en ningún componente del sistema. Se genera un hash BCrypt al crear o actualizar usuarios y se verifica con `BcryptUtil.matches` en el login básico, sin sesión ni almacenamiento en el navegador.
 Verificación:
-No son recuperables en su forma original; no aparecen en respuestas ni en registros de auditoría.
+El hash no es reversible; la contraseña no aparece en respuestas ni en registros de auditoría. `hashPassword`, `intentosFallidos` y `bloqueadoHasta` nunca se serializan.
 Prioridad:
 Alta.
 
-### RNF-002 - Control de acceso
+### RNF-002 - Control de acceso (solo filtro visual; no vigente como autorización)
 
 Categoría:
 Seguridad.
 Descripción:
-El acceso a la información y a las operaciones debe depender estrictamente del rol y el ámbito institucional del usuario.
+El control de acceso por rol y ámbito institucional no está vigente. Los roles y carreras se conservan como datos de dominio; el login básico solo filtra menús y rutas en React. No hay sesión, identidad de actor ni permisos en la API.
 Verificación:
-Solo se ejecutan operaciones autorizadas; un usuario limitado a una carrera no accede a otras; los accesos no autorizados se rechazan.
+El único 401 es el del login básico con mensaje genérico; no se devuelve 403 por falta de permiso. Las operaciones se rigen por validaciones de existencia y reglas de negocio, no por autorización.
 Prioridad:
-Alta.
+Alta (pendiente a futuro).
 
 ### RNF-003 - Protección de la información
 
 Categoría:
 Seguridad e integridad.
 Descripción:
-Los datos personales, académicos, empresariales y administrativos deben protegerse frente a accesos o modificaciones no autorizadas.
+Los datos personales, académicos, empresariales y administrativos deben protegerse frente a exposición o modificación indebida. No hay control de acceso por rol o ámbito: la protección se apoya en validaciones, integridad referencial y no exposición de datos sensibles.
 Verificación:
-Cada consulta o modificación verifica permisos; los datos sensibles no se muestran sin autorización.
+Las consultas son parametrizadas; se validan existencia y reglas de negocio; contraseñas y secretos no aparecen en respuestas ni logs.
 Prioridad:
 Alta.
 
@@ -358,7 +358,7 @@ Auditoría.
 Descripción:
 El sistema debe conservar registros inalterables que permitan reconstruir las acciones ejecutadas en los distintos procesos.
 Verificación:
-Los eventos auditables incluyen usuario, operación y momento; los usuarios ordinarios no pueden modificarlos.
+Los eventos auditables incluyen usuario, operación y momento; la API no modifica ni elimina esos registros. El contexto de actor ya no se fija desde la aplicación (`CONTEXTO_ACTOR.md`).
 Prioridad:
 Alta.
 
@@ -369,7 +369,7 @@ Usabilidad.
 Descripción:
 Las funcionalidades deben presentarse de forma comprensible, intuitiva y utilizando la terminología propia del dominio académico.
 Verificación:
-Opciones mostradas según el rol; campos requeridos identificados; mensajes de validación claros; estados comprensibles.
+Menú institucional único, sin opciones por rol ni sesión; campos requeridos identificados; mensajes de validación claros; estados comprensibles.
 Prioridad:
 Alta.
 
@@ -400,7 +400,7 @@ Media.
 Categoría:
 Disponibilidad.
 Descripción:
-Los usuarios autorizados deben poder consultar la información registrada mientras el servicio esté operativo, sin pérdidas por operaciones fallidas.
+Los usuarios deben poder consultar la información registrada mientras el servicio esté operativo, sin pérdidas por operaciones fallidas. No hay restricción de consulta por rol ni sesión.
 Verificación:
 La información registrada permanece disponible; los errores no exponen datos internos.
 Prioridad:
@@ -430,7 +430,7 @@ Independencia de datos previos: El sistema se diseña como una solución central
 ### Restricciones funcionales y de dominio
 
 Ámbito del sistema: PRAXIS se circunscribe estrictamente a la gestión administrativa y académica de prácticas preprofesionales, sin abarcar bolsas de empleo externas o procesos de titulación ajenos a la práctica.
-Control de acceso estricto: Ningún usuario puede operar fuera de los límites de su rol y unidad académica (carrera o facultad) asignada.
+Control de acceso estricto: **no vigente; pendiente a futuro.** No hay sesión ni autorización por rol o unidad académica. Roles, carreras y facultades se conservan como datos de dominio y las operaciones se rigen por reglas de negocio.
 Flujo secuencial obligatorio: No se permite omitir etapas del ciclo de vida; toda oferta requiere aprobación institucional antes de ser pública, toda postulación debe cumplir requisitos previos y toda formalización exige una postulación aprobada, un convenio vigente y responsables asignados.
 
 ### Restricciones institucionales y parámetros pendientes
@@ -442,11 +442,11 @@ Parámetros pendientes de aprobación: El desarrollo no debe fijar valores rígi
   * Requisitos académicos específicos por carrera y periodo.
   * Documentación obligatoria para la formalización de prácticas.
   * Plazos de vigencia de convenios y tiempos límite para revisión de ofertas/postulaciones.
-  * Políticas y flujos específicos para la recuperación de contraseñas.
+  * Políticas y flujos específicos para la recuperación de contraseñas (no vigentes; pendientes a futuro).
 
 ### Limitaciones del alcance (MVP)
 
-Alcance incluido en la primera versión: El desarrollo inicial (MVP) se limita al flujo previo al inicio efectivo de la práctica: gestión de usuarios y accesos, estructura académica, perfiles de estudiantes, empresas y convenios, ciclo de ofertas (registro, revisión y consulta), ciclo de postulaciones (registro y resolución), formalización inicial con asignación de docente tutor y registro básico de auditoría.
+Alcance incluido en la primera versión: El desarrollo inicial (MVP) se limita al flujo previo al inicio efectivo de la práctica: gestión de usuarios (roles y carreras como datos de dominio, sin autenticación ni control de acceso), estructura académica, perfiles de estudiantes, empresas y convenios, ciclo de ofertas (registro, revisión y consulta), ciclo de postulaciones (registro y resolución), formalización inicial con asignación de docente tutor y registro básico de auditoría.
 Funcionalidades excluidas del MVP: Quedan fuera de esta primera entrega todos los procesos de ejecución, seguimiento y cierre: registro y validación de actividades/horas, entrega de informes, visitas de seguimiento, gestión de incidencias, evaluaciones de desempeño, emisión de certificados y reportes analíticos avanzados.
 
 ## Trazabilidad
@@ -454,8 +454,8 @@ Funcionalidades excluidas del MVP: Quedan fuera de esta primera entrega todos lo
 Cada requisito se vincula con una necesidad u objetivo del producto, el módulo o proceso donde se aplica y el criterio que permite verificarlo.
 
 RF-001: Necesidad: gestionar usuarios y accesos. Módulo: administración de usuarios. Verificación: usuario registrado o actualizado con estado reflejado y validaciones aplicadas.
-RF-002: Necesidad: controlar el acceso por rol y ámbito. Módulo: autenticación y seguridad. Verificación: acceso solo a funcionalidades permitidas por rol y ámbito.
-RF-003: Necesidad: proteger las cuentas ante intentos fallidos. Módulo: seguridad de cuentas. Verificación: bloqueo tras el límite configurable y recuperación de contraseña funcional.
+RF-002: **No vigente en su parte de acceso; pendiente a futuro.** Los roles y carreras se conservan como datos de dominio. Módulo: administración de usuarios. Verificación: roles registrados, sin sesión ni permisos por rol.
+RF-003: **No vigente en ingreso, intentos, bloqueo ni recuperación.** Módulo: administración de usuarios. Verificación: contraseñas hasheadas con BCrypt al crear o actualizar; nunca expuestas.
 RF-004: Necesidad: organizar la estructura académica. Módulo: estructura académica. Verificación: facultades, carreras y periodos relacionados, con un único periodo vigente identificado.
 RF-005: Necesidad: vincular usuarios con perfiles académicos. Módulo: perfiles académicos. Verificación: perfil asociado a una cuenta y carrera existentes.
 RF-006: Necesidad: definir y verificar requisitos académicos. Módulo: requisitos académicos. Verificación: requisitos definidos y cumplimiento consultable.
@@ -478,14 +478,14 @@ RF-022: Necesidad: gestionar incidencias. Módulo: incidencias. Verificación: i
 RF-023: Necesidad: evaluar el desempeño. Módulo: evaluación. Verificación: evaluaciones con criterios y calificaciones registradas.
 RF-024: Necesidad: determinar el resultado final. Módulo: cierre de práctica. Verificación: nota calculada y práctica finalizada o reprobada.
 RF-025: Necesidad: emitir certificados verificables. Módulo: certificados. Verificación: certificado con código único, descargable y verificable.
-RF-026: Necesidad: generar reportes institucionales. Módulo: reportes. Verificación: reportes consultables solo por usuarios autorizados.
-RF-027: Necesidad: auditar operaciones. Módulo: auditoría. Verificación: eventos con usuario, operación y momento, inalterables y consultables por autorizados.
-RNF-001: Necesidad: proteger credenciales. Categoría: seguridad. Verificación: contraseñas no recuperables ni expuestas.
-RNF-002: Necesidad: controlar acceso por rol y ámbito. Categoría: seguridad. Verificación: toda operación verifica rol y ámbito.
-RNF-003: Necesidad: proteger información sensible. Categoría: seguridad e integridad. Verificación: permisos verificados en cada consulta o modificación.
+RF-026: Necesidad: generar reportes institucionales. Módulo: reportes. Verificación: reportes consultables sin control de acceso por rol; fuera del MVP.
+RF-027: Necesidad: auditar operaciones. Módulo: auditoría. Verificación: eventos con usuario, operación y momento, inalterables; sin control de acceso por rol.
+RNF-001: Necesidad: proteger credenciales. Categoría: seguridad. Verificación: hash BCrypt al crear, restablecer y verificar; contraseñas no recuperables ni expuestas.
+RNF-002: **No vigente como autorización; pendiente a futuro.** Necesidad: controlar acceso por rol y ámbito. Categoría: seguridad. Verificación: el login básico filtra pantallas en React; no hay sesión ni permisos en la API.
+RNF-003: Necesidad: proteger información sensible. Categoría: seguridad e integridad. Verificación: consultas parametrizadas, validaciones de negocio y sin exposición de secretos; el filtro de roles no protege la API.
 RNF-004: Necesidad: mantener integridad referencial. Categoría: integridad. Verificación: sin referencias inexistentes ni datos parciales.
-RNF-005: Necesidad: conservar trazabilidad. Categoría: auditoría. Verificación: registros inalterables con usuario, operación y momento.
-RNF-006: Necesidad: garantizar usabilidad. Categoría: usabilidad. Verificación: opciones por rol, campos identificados y mensajes claros.
+RNF-005: Necesidad: conservar trazabilidad. Categoría: auditoría. Verificación: registros inalterables con usuario, operación y momento; la aplicación no fija el contexto de actor (`CONTEXTO_ACTOR.md`).
+RNF-006: Necesidad: garantizar usabilidad. Categoría: usabilidad. Verificación: menú filtrado por rol solo en el prototipo, campos identificados y mensajes claros.
 RNF-007: Necesidad: permitir acceso web. Categoría: compatibilidad. Verificación: funciones principales operan en navegadores soportados.
 RNF-008: Necesidad: facilitar mantenimiento. Categoría: mantenibilidad. Verificación: cambios no afectan módulos no relacionados.
 RNF-009: Necesidad: mantener información disponible. Categoría: disponibilidad. Verificación: información disponible y errores sin exposición de datos.

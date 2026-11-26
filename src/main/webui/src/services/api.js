@@ -1,15 +1,12 @@
-const EVENTO_SESION_EXPIRADA = 'praxis:sesion-expirada';
-
 const MENSAJES_ESTADO = {
   400: 'Los datos enviados no son válidos.',
-  401: 'Su sesión ha vencido. Ingrese nuevamente.',
-  403: 'No tiene permiso para realizar esta operación.',
+  401: 'Correo o contraseña incorrectos.',
   404: 'No se encontró el registro solicitado.',
   409: 'La operación no puede completarse por una regla de negocio.',
   500: 'Ocurrió un error en el servidor.',
 };
 
-// `codigo` solo contiene códigos de CONTRATOS_REST.md; `codigoInterno` clasifica fallos del cliente.
+
 export class ApiError extends Error {
   constructor(estado, mensaje, codigo, codigoInterno = null) {
     super(mensaje);
@@ -33,8 +30,7 @@ function construirUrl(ruta, parametros) {
 function codigoPorEstado(estado) {
   return {
     400: 'DATOS_INVALIDOS',
-    401: 'SIN_SESION',
-    403: 'SIN_PERMISO',
+    401: 'CREDENCIALES_INVALIDAS',
     404: 'NO_ENCONTRADO',
     409: 'REGLA_NEGOCIO',
     500: 'ERROR_INTERNO',
@@ -44,7 +40,6 @@ function codigoPorEstado(estado) {
 export async function solicitar(ruta, { metodo = 'GET', cuerpo, parametros } = {}) {
   const opciones = {
     method: metodo,
-    credentials: 'include',
     headers: { Accept: 'application/json' },
   };
 
@@ -77,9 +72,6 @@ export async function solicitar(ruta, { metodo = 'GET', cuerpo, parametros } = {
   if (!respuesta.ok) {
     const mensaje = datos?.mensaje || MENSAJES_ESTADO[respuesta.status] || 'La operación no pudo completarse.';
     const codigo = datos?.codigo || codigoPorEstado(respuesta.status);
-    if (respuesta.status === 401 && ruta !== '/auth/login') {
-      window.dispatchEvent(new CustomEvent(EVENTO_SESION_EXPIRADA));
-    }
     throw new ApiError(respuesta.status, mensaje, codigo);
   }
 

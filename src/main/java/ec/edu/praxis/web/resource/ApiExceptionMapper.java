@@ -10,10 +10,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
-/**
- * Traduce las excepciones al formato único de CONTRATOS_REST.md §6.
- * Solo clasifica la causa real: no convierte toda excepción en 409.
- */
+
 @Provider
 public class ApiExceptionMapper implements ExceptionMapper<Throwable> {
 
@@ -27,7 +24,7 @@ public class ApiExceptionMapper implements ExceptionMapper<Throwable> {
         }
         if (esConflictoConcurrencia(exception)) {
             return respuesta(409, "CONFLICTO_CONCURRENCIA",
-                    "El registro fue modificado por otra operación.");
+        "El registro fue modificado por otra operación.");
         }
         SQLException sql = encontrarSQLException(exception);
         if (sql != null) {
@@ -40,8 +37,7 @@ public class ApiExceptionMapper implements ExceptionMapper<Throwable> {
         int status = web.getResponse().getStatus();
         return switch (status) {
             case 400 -> respuesta(400, "DATOS_INVALIDOS", "Datos inválidos.");
-            case 401 -> respuesta(401, "SIN_SESION", "Se requiere sesión.");
-            case 403 -> respuesta(403, "SIN_PERMISO", "Sin permiso para la operación.");
+            case 401 -> respuesta(401, "CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos.");
             case 404 -> respuesta(404, "NO_ENCONTRADO", "Recurso no encontrado.");
             default -> respuesta(status, "ERROR_INTERNO", "Error interno del servidor.");
         };
@@ -52,24 +48,24 @@ public class ApiExceptionMapper implements ExceptionMapper<Throwable> {
         if (state == null) {
             return respuesta(500, "ERROR_INTERNO", "Error interno del servidor.");
         }
-        // Unicidad de la base.
+
         if (state.equals("23505")) {
             return respuesta(409, "DUPLICADO", "Ya existe un registro con esos datos.");
         }
-        // Integridad referencial: existen registros dependientes.
+
         if (state.equals("23503")) {
             return respuesta(409, "REGLA_NEGOCIO",
-                    "Existen registros dependientes que impiden la operación.");
+        "Existen registros dependientes que impiden la operación.");
         }
-        // Campo obligatorio ausente o longitud superior a la columna.
+
         if (state.equals("23502") || state.equals("22001")) {
             return respuesta(400, "DATOS_INVALIDOS",
-                    "Faltan datos obligatorios o su longitud no es válida.");
+        "Faltan datos obligatorios o su longitud no es válida.");
         }
-        // Resto de restricciones y errores lanzados por triggers (P0001).
+
         if (state.startsWith("23") || state.equals("P0001")) {
             return respuesta(409, "REGLA_NEGOCIO",
-                    "La operación no cumple una regla de negocio.");
+        "La operación no cumple una regla de negocio.");
         }
         return respuesta(500, "ERROR_INTERNO", "Error interno del servidor.");
     }
@@ -79,8 +75,8 @@ public class ApiExceptionMapper implements ExceptionMapper<Throwable> {
         for (int i = 0; actual != null && i < 32; i++) {
             String nombre = actual.getClass().getName();
             if (actual instanceof OptimisticLockException
-                    || nombre.endsWith("StaleStateException")
-                    || nombre.endsWith("StaleObjectStateException")) {
+        || nombre.endsWith("StaleStateException")
+        || nombre.endsWith("StaleObjectStateException")) {
                 return true;
             }
             Throwable siguiente = actual.getCause();
@@ -114,7 +110,7 @@ public class ApiExceptionMapper implements ExceptionMapper<Throwable> {
                 .build();
     }
 
-    /** Estructura de salida: no se devuelve una entidad JPA. */
+
     public static class ErrorResponse {
 
         private final String codigo;

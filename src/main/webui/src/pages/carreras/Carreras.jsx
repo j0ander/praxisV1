@@ -5,7 +5,6 @@ import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
 import Modal from '../../components/comunes/Modal';
 import Tabla from '../../components/comunes/Tabla';
-import { useSesion } from '../../contextos/SesionContexto';
 import { mensajeDeError } from '../../services/api';
 import {
   actualizarCarrera,
@@ -41,9 +40,6 @@ function validarFormulario(formulario) {
 }
 
 export default function Carreras() {
-  const { tieneRol } = useSesion();
-  const esAdmin = tieneRol('ADMINISTRADOR');
-
   const [facultades, setFacultades] = useState([]);
   const [cargandoFacultades, setCargandoFacultades] = useState(true);
   const [errorFacultades, setErrorFacultades] = useState(null);
@@ -239,24 +235,22 @@ export default function Carreras() {
     },
   ];
 
-  if (esAdmin) {
-    columnas.push({
-      clave: 'acciones',
-      titulo: 'Acciones',
-      render: (carrera) => (
-        <div className="acciones">
-          <Boton variante="enlace" pequeno onClick={() => abrirEditar(carrera)}>
-            Editar
+  columnas.push({
+    clave: 'acciones',
+    titulo: 'Acciones',
+    render: (carrera) => (
+      <div className="acciones">
+        <Boton variante="enlace" pequeno onClick={() => abrirEditar(carrera)}>
+          Editar
+        </Boton>
+        {carrera.activa ? (
+          <Boton variante="enlace" pequeno onClick={() => pedirDesactivacion(carrera)}>
+            Desactivar
           </Boton>
-          {carrera.activa ? (
-            <Boton variante="enlace" pequeno onClick={() => pedirDesactivacion(carrera)}>
-              Desactivar
-            </Boton>
-          ) : null}
-        </div>
-      ),
-    });
-  }
+        ) : null}
+      </div>
+    ),
+  });
 
   const idsFacultades = new Set(facultades.map((facultad) => String(facultad.id)));
   const facultadActualListada = !formulario.facultadId
@@ -270,7 +264,7 @@ export default function Carreras() {
           <h1>Carreras</h1>
           <p>Consulte y administre las carreras de la institución por facultad.</p>
         </div>
-        {esAdmin ? <Boton onClick={abrirCrear}>Nueva carrera</Boton> : null}
+        <Boton onClick={abrirCrear}>Nueva carrera</Boton>
       </div>
 
       <MensajeEstado tipo={resultado?.tipo} mensaje={resultado?.mensaje} />

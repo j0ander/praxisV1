@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-import { SesionProveedor } from './contextos/SesionContexto';
 import AppRoutes from './routes/AppRoutes';
 
 export default function App() {
+  const [usuario, setUsuario] = useState(null);
+
   return (
-    <SesionProveedor>
-      <AppRoutes />
-    </SesionProveedor>
+    <AppRoutes
+      usuario={usuario}
+      onIniciarSesion={setUsuario}
+      onCerrarSesion={() => setUsuario(null)}
+    />
   );
 }

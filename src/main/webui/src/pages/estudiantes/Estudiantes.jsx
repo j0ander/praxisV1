@@ -4,7 +4,6 @@ import Boton from '../../components/comunes/Boton';
 import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
 import Tabla from '../../components/comunes/Tabla';
-import { useSesion } from '../../contextos/SesionContexto';
 import { mensajeDeError } from '../../services/api';
 import { listarCarreras } from '../../services/estructuraService';
 import {
@@ -23,8 +22,6 @@ const PERFIL_VACIO = {
 };
 
 export default function Estudiantes() {
-  const { tieneRol } = useSesion();
-  const esAdmin = tieneRol('ADMINISTRADOR');
   const [carreras, setCarreras] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [cargandoUsuarios, setCargandoUsuarios] = useState(false);
@@ -45,7 +42,6 @@ export default function Estudiantes() {
   }, []);
 
   const cargarUsuarios = useCallback(() => {
-    if (!esAdmin) return;
     setCargandoUsuarios(true);
     setErrorUsuarios(null);
     listarUsuarios()
@@ -55,7 +51,7 @@ export default function Estudiantes() {
         setErrorUsuarios(mensajeDeError(fallo));
       })
       .finally(() => setCargandoUsuarios(false));
-  }, [esAdmin]);
+  }, []);
 
   useEffect(() => {
     cargarUsuarios();
@@ -187,7 +183,7 @@ export default function Estudiantes() {
             <div className="rejilla">
               {esEdicion ? (
                 <CampoFormulario id="usuario-perfil" etiqueta="Usuario" value={perfil.usuarioId} disabled readOnly />
-              ) : esAdmin ? (
+              ) : (
                 <CampoFormulario id="usuario-perfil" etiqueta="Usuario" obligatorio>
                   <select
                     id="usuario-perfil"
@@ -213,20 +209,6 @@ export default function Estudiantes() {
                   {!cargandoUsuarios && !errorUsuarios && usuarios.length === 0 ? (
                     <small>No hay usuarios disponibles para asignar.</small>
                   ) : null}
-                </CampoFormulario>
-              ) : (
-                <CampoFormulario id="usuario-perfil" etiqueta="ID del usuario" obligatorio>
-                  <input
-                    id="usuario-perfil"
-                    type="number"
-                    value={formulario.usuarioId}
-                    onChange={(evento) => cambiarCampo('usuarioId', evento.target.value)}
-                    required
-                  />
-                  <small>
-                    Introduzca el ID del usuario: actualmente no existe un endpoint
-                    autorizado para consultar usuarios candidatos dentro de su ámbito.
-                  </small>
                 </CampoFormulario>
               )}
               <CampoFormulario id="carrera-perfil" etiqueta="Carrera" obligatorio>
@@ -266,7 +248,7 @@ export default function Estudiantes() {
               <Boton
                 type="submit"
                 cargando={guardando}
-                disabled={esAdmin && !esEdicion && (Boolean(errorUsuarios) || usuarios.length === 0)}
+                disabled={!esEdicion && (Boolean(errorUsuarios) || usuarios.length === 0)}
               >
                 {esEdicion ? 'Guardar cambios' : 'Crear perfil'}
               </Boton>

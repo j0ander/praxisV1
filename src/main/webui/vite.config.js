@@ -2,21 +2,34 @@ import { defineConfig } from 'vite';
 
 const backend = process.env.PRAXIS_API || 'http://127.0.0.1:8080';
 
-const rutasApi = [
-  '/auth',
-  '/usuarios',
-  '/estudiantes',
-  '/docentes',
-  '/facultades',
-  '/carreras',
-  '/periodos',
-  '/tiposPractica',
-  '/empresas',
-  '/convenios',
-];
+const prefijosApi = [
+  'usuarios',
+  'estudiantes',
+  'docentes',
+  'facultades',
+  'carreras',
+  'periodos',
+  'tiposPractica',
+  'empresas',
+  'convenios',
+].join('|');
+
+
+
+const rutaApi = `^/(?:${prefijosApi})(?:/|$)`;
 
 function proxyApi() {
-  return Object.fromEntries(rutasApi.map((ruta) => [ruta, { target: backend, changeOrigin: false }]));
+  return {
+    [rutaApi]: {
+      target: backend,
+      changeOrigin: false,
+      bypass(req) {
+        if (String(req.headers.accept || '').includes('text/html')) {
+          return '/index.html';
+        }
+      },
+    },
+  };
 }
 
 export default defineConfig({

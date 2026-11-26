@@ -13,7 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Entidad de la tabla periodo_academico (MODELO_DATOS.md §4.7). */
+
 @Entity
 @Table(name = "periodo_academico")
 public class PeriodoAcademico {

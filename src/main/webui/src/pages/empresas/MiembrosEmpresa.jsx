@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Boton from '../../components/comunes/Boton';
 import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
+import SelectorUsuarios from '../../components/comunes/SelectorUsuarios';
 import Tabla from '../../components/comunes/Tabla';
 import { nombreRolEmpresa, ROLES_EMPRESA } from '../../constantes';
 import { mensajeDeError } from '../../services/api';
@@ -67,11 +68,8 @@ export default function MiembrosEmpresa({ empresaId, puedeGestionar = true }) {
 
   function validar() {
     const errores = {};
-    if (!editando) {
-      const usuarioId = Number(formulario.usuarioId);
-      if (!formulario.usuarioId || !Number.isInteger(usuarioId) || usuarioId <= 0) {
-        errores.usuarioId = 'Ingrese un id de usuario válido.';
-      }
+    if (!editando && !formulario.usuarioId) {
+      errores.usuarioId = 'Seleccione un usuario.';
     }
     if (!ROLES_EMPRESA.includes(formulario.rolEmpresa)) {
       errores.rolEmpresa = 'Seleccione un rol de empresa válido.';
@@ -182,14 +180,13 @@ export default function MiembrosEmpresa({ empresaId, puedeGestionar = true }) {
               <input id="miembro-usuario-actual" value={editando.usuarioId} disabled />
             </CampoFormulario>
           ) : (
-            <CampoFormulario
+            <SelectorUsuarios
               id="miembro-usuario"
-              etiqueta="ID del usuario"
+              valor={formulario.usuarioId}
+              onChange={(valor) => cambiarCampo('usuarioId', valor)}
+              rol="REPRESENTANTE_EMPRESA"
+              excluirIds={miembros.map((miembro) => miembro.usuarioId)}
               obligatorio
-              type="number"
-              min="1"
-              value={formulario.usuarioId}
-              onChange={(evento) => cambiarCampo('usuarioId', evento.target.value)}
               error={erroresCampos.usuarioId}
             />
           )}

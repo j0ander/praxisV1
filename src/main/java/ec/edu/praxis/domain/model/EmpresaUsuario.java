@@ -13,7 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
-/** Entidad de la tabla empresa_usuario (MODELO_DATOS.md §4.27). */
+
 @Entity
 @Table(name = "empresa_usuario", uniqueConstraints = @UniqueConstraint(
         name = "uq_empresa_usuario", columnNames = { "empresa_id", "usuario_id" }))

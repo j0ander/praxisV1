@@ -5,8 +5,6 @@ import java.util.List;
 import ec.edu.praxis.application.service.ApiException;
 import ec.edu.praxis.application.service.UsuarioService;
 import ec.edu.praxis.domain.model.Usuario;
-import io.quarkus.security.Authenticated;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -19,8 +17,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-/** API-024 a API-032: administración de cuentas, roles y carreras. */
-@Authenticated
+
 @Path("/usuarios")
 @Produces(MediaType.APPLICATION_JSON)
 public class UsuarioResource {
@@ -30,7 +27,6 @@ public class UsuarioResource {
 
     @GET
     @Path("/listarTodos")
-    @RolesAllowed("ADMINISTRADOR")
     public Response listar(@QueryParam("rol") String rol, @QueryParam("activo") Boolean activo,
             @QueryParam("texto") String texto) {
         List<UsuarioResumen> respuesta = service.listar(rol, activo, texto).stream()
@@ -40,14 +36,23 @@ public class UsuarioResource {
 
     @GET
     @Path("/buscar/{id}")
-    @RolesAllowed("ADMINISTRADOR")
     public Response buscar(@PathParam("id") Long id) {
         return Response.ok(resumen(service.buscar(id))).build();
     }
 
     @POST
+    @Path("/login")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
+    public Response login(LoginRequest solicitud) {
+        if (solicitud == null) {
+            throw ApiException.credencialesInvalidas();
+        }
+        Usuario usuario = service.autenticar(solicitud.getCorreo(), solicitud.getPassword());
+        return Response.ok(new LoginResponse(usuario, service.rolesDe(usuario.getId()))).build();
+    }
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
     public Response crear(UsuarioRequest solicitud) {
         if (solicitud == null) {
             throw ApiException.datosInvalidos("Los datos del usuario son obligatorios.");
@@ -58,7 +63,6 @@ public class UsuarioResource {
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response actualizar(UsuarioRequest solicitud) {
         if (solicitud == null || solicitud.id == null) {
             throw ApiException.datosInvalidos("El id del usuario es obligatorio.");
@@ -69,7 +73,6 @@ public class UsuarioResource {
 
     @POST
     @Path("/{id}/activar")
-    @RolesAllowed("ADMINISTRADOR")
     public Response activar(@PathParam("id") Long id) {
         service.activar(id);
         return Response.ok().build();
@@ -77,7 +80,6 @@ public class UsuarioResource {
 
     @POST
     @Path("/{id}/desactivar")
-    @RolesAllowed("ADMINISTRADOR")
     public Response desactivar(@PathParam("id") Long id) {
         service.desactivar(id);
         return Response.ok().build();
@@ -86,7 +88,6 @@ public class UsuarioResource {
     @POST
     @Path("/{id}/restablecerPassword")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response restablecerPassword(@PathParam("id") Long id, RestablecerPasswordRequest solicitud) {
         service.restablecerPassword(id, solicitud == null ? null : solicitud.passwordTemporal);
         return Response.noContent().build();
@@ -95,7 +96,6 @@ public class UsuarioResource {
     @PUT
     @Path("/{id}/roles")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response asignarRoles(@PathParam("id") Long id, AsignarRolesRequest solicitud) {
         service.asignarRoles(id, solicitud == null ? null : solicitud.roles);
         return Response.ok().build();
@@ -104,7 +104,6 @@ public class UsuarioResource {
     @PUT
     @Path("/{id}/carreras")
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response asignarCarreras(@PathParam("id") Long id, AsignarCarrerasRequest solicitud) {
         service.asignarCarreras(id, solicitud == null ? null : solicitud.carreraIds);
         return Response.ok().build();
@@ -127,7 +126,67 @@ public class UsuarioResource {
         return usuario;
     }
 
-    /** Entrada de API-026 y API-027; passwordTemporal solo se usa al crear. */
+
+    public static class LoginRequest {
+
+        private String correo;
+        private String password;
+
+        public String getCorreo() {
+            return correo;
+        }
+
+        public void setCorreo(String correo) {
+            this.correo = correo;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+
+    public static class LoginResponse {
+
+        private final Long id;
+        private final String nombres;
+        private final String apellidos;
+        private final String correo;
+        private final List<String> roles;
+
+        LoginResponse(Usuario usuario, List<String> roles) {
+            this.id = usuario.getId();
+            this.nombres = usuario.getNombres();
+            this.apellidos = usuario.getApellidos();
+            this.correo = usuario.getCorreo();
+            this.roles = roles;
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public String getNombres() {
+            return nombres;
+        }
+
+        public String getApellidos() {
+            return apellidos;
+        }
+
+        public String getCorreo() {
+            return correo;
+        }
+
+        public List<String> getRoles() {
+            return roles;
+        }
+    }
+
+
     public static class UsuarioRequest {
 
         private Long id;
@@ -252,7 +311,6 @@ public class UsuarioResource {
         }
     }
 
-    /** Estructura de salida; nunca expone credenciales. */
     public static class UsuarioResumen {
 
         private final Long id;

@@ -7,7 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Entidad de la tabla rol (MODELO_DATOS.md §4.1). No se asigna id desde el código. */
+
 @Entity
 @Table(name = "rol")
 public class Rol {

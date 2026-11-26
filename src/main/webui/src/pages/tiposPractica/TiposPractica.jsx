@@ -5,7 +5,6 @@ import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
 import Modal from '../../components/comunes/Modal';
 import Tabla from '../../components/comunes/Tabla';
-import { useSesion } from '../../contextos/SesionContexto';
 import { mensajeDeError } from '../../services/api';
 import {
   actualizarTipoPractica,
@@ -54,9 +53,6 @@ function validarFormulario(formulario) {
 }
 
 export default function TiposPractica() {
-  const { tieneRol } = useSesion();
-  const esAdmin = tieneRol('ADMINISTRADOR');
-
   const [tipos, setTipos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -220,34 +216,32 @@ export default function TiposPractica() {
     },
   ];
 
-  if (esAdmin) {
-    columnas.push({
-      clave: 'acciones',
-      titulo: 'Acciones',
-      render: (tipo) => (
-        <div className="acciones">
+  columnas.push({
+    clave: 'acciones',
+    titulo: 'Acciones',
+    render: (tipo) => (
+      <div className="acciones">
+        <Boton
+          variante="enlace"
+          pequeno
+          disabled={ocupado}
+          onClick={() => abrirEditar(tipo)}
+        >
+          Editar
+        </Boton>
+        {tipo.activo ? (
           <Boton
             variante="enlace"
             pequeno
             disabled={ocupado}
-            onClick={() => abrirEditar(tipo)}
+            onClick={() => pedirDesactivacion(tipo)}
           >
-            Editar
+            Desactivar
           </Boton>
-          {tipo.activo ? (
-            <Boton
-              variante="enlace"
-              pequeno
-              disabled={ocupado}
-              onClick={() => pedirDesactivacion(tipo)}
-            >
-              Desactivar
-            </Boton>
-          ) : null}
-        </div>
-      ),
-    });
-  }
+        ) : null}
+      </div>
+    ),
+  });
 
   return (
     <>
@@ -256,11 +250,9 @@ export default function TiposPractica() {
           <h1>Tipos de práctica</h1>
           <p>Mantenga el catálogo con sus horas requeridas y nota mínima.</p>
         </div>
-        {esAdmin ? (
-          <Boton onClick={abrirCrear} disabled={ocupado}>
-            Nuevo tipo de práctica
-          </Boton>
-        ) : null}
+        <Boton onClick={abrirCrear} disabled={ocupado}>
+          Nuevo tipo de práctica
+        </Boton>
       </div>
 
       <MensajeEstado tipo={resultado?.tipo} mensaje={resultado?.mensaje} />

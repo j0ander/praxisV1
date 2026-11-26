@@ -17,7 +17,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Entidad de la tabla convenio (MODELO_DATOS.md §4.14). */
+
 @Entity
 @Table(name = "convenio")
 public class Convenio {

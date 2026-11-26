@@ -3,7 +3,6 @@ package ec.edu.praxis.infrastructure.repository;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,15 +14,15 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 
-/** Persistencia de convenios y consulta del estado efectivo (API-043 a API-047). */
+
 @ApplicationScoped
 public class ConvenioRepository implements PanacheRepositoryBase<Convenio, Long> {
 
     static final String SQL_LISTAR_RESUMEN =
             "SELECT c.id, c.empresa_id, c.numero, c.fecha_inicio, c.fecha_fin, c.estado, "
-                    + "v.estado_efectivo, c.documento_url, c.created_at, c.updated_at "
-                    + "FROM convenio c JOIN v_convenio_estado v ON v.id = c.id "
-                    + "WHERE c.empresa_id = :empresaId ORDER BY c.fecha_inicio DESC, c.id DESC";
+        + "v.estado_efectivo, c.documento_url, c.created_at, c.updated_at "
+        + "FROM convenio c JOIN v_convenio_estado v ON v.id = c.id "
+        + "WHERE c.empresa_id = :empresaId ORDER BY c.fecha_inicio DESC, c.id DESC";
 
     static final String SQL_ESTADO_EFECTIVO =
             "SELECT estado_efectivo FROM v_convenio_estado WHERE id = :id";
@@ -41,17 +40,13 @@ public class ConvenioRepository implements PanacheRepositoryBase<Convenio, Long>
     public Convenio buscarPorNumero(String numero) {
         try {
             return em.createQuery("SELECT c FROM Convenio c WHERE c.numero = :numero", Convenio.class)
-                    .setParameter("numero", numero)
-                    .getSingleResult();
+        .setParameter("numero", numero)
+        .getSingleResult();
         } catch (NoResultException e) {
             return null;
         }
     }
 
-    /**
-     * Proyección de solo lectura: datos del convenio más el estado calculado por
-     * la vista. Nunca se escribe sobre la vista.
-     */
     public List<Resumen> listarResumenPorEmpresa(Long empresaId) {
         @SuppressWarnings("unchecked")
         List<Object[]> filas = em.createNativeQuery(SQL_LISTAR_RESUMEN)
@@ -60,16 +55,16 @@ public class ConvenioRepository implements PanacheRepositoryBase<Convenio, Long>
         List<Resumen> respuesta = new ArrayList<>(filas.size());
         for (Object[] fila : filas) {
             respuesta.add(new Resumen(
-                    ((Number) fila[0]).longValue(),
-                    ((Number) fila[1]).longValue(),
-                    (String) fila[2],
-                    aLocalDate(fila[3]),
-                    aLocalDate(fila[4]),
-                    EstadoConvenio.valueOf((String) fila[5]),
-                    (String) fila[6],
-                    (String) fila[7],
-                    aOffsetDateTime(fila[8]),
-                    aOffsetDateTime(fila[9])));
+        ((Number) fila[0]).longValue(),
+        ((Number) fila[1]).longValue(),
+        (String) fila[2],
+        aLocalDate(fila[3]),
+        aLocalDate(fila[4]),
+        EstadoConvenio.valueOf((String) fila[5]),
+        (String) fila[6],
+        (String) fila[7],
+        aOffsetDateTime(fila[8]),
+        aOffsetDateTime(fila[9])));
         }
         return respuesta;
     }
@@ -77,8 +72,8 @@ public class ConvenioRepository implements PanacheRepositoryBase<Convenio, Long>
     public String estadoEfectivoPorId(Long id) {
         try {
             Object valor = em.createNativeQuery(SQL_ESTADO_EFECTIVO)
-                    .setParameter("id", id)
-                    .getSingleResult();
+        .setParameter("id", id)
+        .getSingleResult();
             return valor == null ? null : valor.toString();
         } catch (NoResultException e) {
             return null;
@@ -105,13 +100,10 @@ public class ConvenioRepository implements PanacheRepositoryBase<Convenio, Long>
         if (valor instanceof OffsetDateTime fecha) {
             return fecha;
         }
-        if (valor instanceof java.util.Date fecha) {
-            return fecha.toInstant().atOffset(ZoneOffset.UTC);
-        }
         return OffsetDateTime.parse(valor.toString());
     }
 
-    /** Proyección interna de solo lectura para API-043. */
+
     public static class Resumen {
 
         private final Long id;

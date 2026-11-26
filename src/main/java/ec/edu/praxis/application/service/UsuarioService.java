@@ -19,11 +19,10 @@ import ec.edu.praxis.infrastructure.repository.UsuarioRepository;
 import ec.edu.praxis.infrastructure.repository.UsuarioRolRepository;
 import io.quarkus.elytron.security.common.BcryptUtil;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
-/** Administración de cuentas, roles y carreras (API-024 a API-032). */
+
 @ApplicationScoped
 public class UsuarioService {
 
@@ -31,9 +30,6 @@ public class UsuarioService {
     private static final Pattern CEDULA = Pattern.compile("^[0-9]{10}$");
     private static final Pattern PASAPORTE = Pattern.compile("^[A-Z0-9]{5,20}$");
     private static final Set<String> TIPOS_DOCUMENTO = Set.of("CEDULA", "PASAPORTE");
-    private static final String ROL_ADMINISTRADOR = "ADMINISTRADOR";
-    private static final String NOMBRE_ADMIN_INICIAL = "Administrador";
-    private static final String APELLIDO_ADMIN_INICIAL = "Sistema";
 
     @Inject
     UsuarioRepository repository;
@@ -53,9 +49,6 @@ public class UsuarioService {
     @Inject
     DocenteService docenteService;
 
-    @Inject
-    Event<SesionInvalidacionEvent> eventosInvalidacion;
-
     public List<Usuario> listar(String rol, Boolean activo, String texto) {
         return repository.listarConFiltros(rol, activo, texto);
     }
@@ -66,6 +59,17 @@ public class UsuarioService {
 
     public List<String> rolesDe(Long usuarioId) {
         return usuarioRolRepository.listarCodigosPorUsuario(usuarioId);
+    }
+
+    public Usuario autenticar(String correo, String password) {
+        String normalizado = correo == null ? null : correo.trim().toLowerCase(Locale.ROOT);
+        Usuario usuario = normalizado == null ? null : repository.buscarPorCorreo(normalizado);
+        if (usuario == null || !usuario.isActivo()
+                || password == null || password.isBlank()
+                || !BcryptUtil.matches(password, usuario.getHashPassword())) {
+            throw ApiException.credencialesInvalidas();
+        }
+        return usuario;
     }
 
     public List<Long> carrerasDe(Long usuarioId) {
@@ -82,53 +86,8 @@ public class UsuarioService {
         datos.setCorreo(correo);
         datos.setHashPassword(BcryptUtil.bcryptHash(passwordTemporal));
         datos.setActivo(true);
-        datos.setDebeCambiarPassword(true);
-        datos.setIntentosFallidos(0);
-        datos.setBloqueadoHasta(null);
-        datos.setUltimoLogin(null);
         repository.persistAndFlush(datos);
         return datos;
-    }
-
-    /**
-     * Crea el primer administrador solo si todavía no existe ningún usuario con
-     * ese rol. La fila del rol se bloquea para serializar arranques concurrentes.
-     */
-    @Transactional
-    public boolean crearAdministradorInicial(String correo, String password) {
-        Rol rol = rolRepository.buscarPorCodigoBloqueante(ROL_ADMINISTRADOR);
-        if (rol == null) {
-            throw new IllegalStateException(
-                    "El rol ADMINISTRADOR no existe; no se creó el administrador inicial.");
-        }
-        if (repository.existeUsuarioConRol(ROL_ADMINISTRADOR)) {
-            return false;
-        }
-
-        String correoNormalizado = validarCorreo(correo);
-        validarPasswordTemporal(password);
-        validarDuplicados(correoNormalizado, null, null);
-
-        Usuario usuario = new Usuario();
-        usuario.setCorreo(correoNormalizado);
-        usuario.setNombres(NOMBRE_ADMIN_INICIAL);
-        usuario.setApellidos(APELLIDO_ADMIN_INICIAL);
-        usuario.setTipoDocumento("CEDULA");
-        usuario.setTelefono(null);
-        usuario.setAlcanceGlobal(true);
-        validarDatos(usuario);
-
-        usuario.setHashPassword(BcryptUtil.bcryptHash(password));
-        usuario.setActivo(true);
-        usuario.setDebeCambiarPassword(true);
-        usuario.setIntentosFallidos(0);
-        usuario.setBloqueadoHasta(null);
-        usuario.setUltimoLogin(null);
-        repository.persistAndFlush(usuario);
-
-        usuarioRolRepository.persist(new UsuarioRol(usuario.getId(), rol.getId()));
-        usuarioRolRepository.flush();
-        return true;
     }
 
     @Transactional
@@ -162,7 +121,6 @@ public class UsuarioService {
     public void desactivar(Long id) {
         buscarUsuario(id).setActivo(false);
         repository.flush();
-        eventosInvalidacion.fire(new SesionInvalidacionEvent(id));
     }
 
     @Transactional
@@ -170,9 +128,7 @@ public class UsuarioService {
         validarPasswordTemporal(passwordTemporal);
         Usuario usuario = buscarUsuario(id);
         usuario.setHashPassword(BcryptUtil.bcryptHash(passwordTemporal));
-        usuario.setDebeCambiarPassword(true);
         repository.flush();
-        eventosInvalidacion.fire(new SesionInvalidacionEvent(id));
     }
 
     @Transactional
@@ -187,7 +143,7 @@ public class UsuarioService {
             if (!roles.containsKey(normalizado)) {
                 Rol rol = rolRepository.buscarPorCodigo(normalizado);
                 if (rol == null) {
-                    throw ApiException.reglaNegocio("El rol no existe.");
+        throw ApiException.reglaNegocio("El rol no existe.");
                 }
                 roles.put(normalizado, rol);
             }
@@ -205,7 +161,6 @@ public class UsuarioService {
         if (roles.containsKey("DOCENTE")) {
             docenteService.crearPerfilPorRol(id);
         }
-        eventosInvalidacion.fire(new SesionInvalidacionEvent(id));
     }
 
     @Transactional
@@ -267,7 +222,7 @@ public class UsuarioService {
         if (correo == null || correo.isBlank()) {
             throw ApiException.datosInvalidos("El correo es obligatorio.");
         }
-        String normalizado = AutenticacionService.normalizar(correo);
+        String normalizado = correo.trim().toLowerCase(Locale.ROOT);
         if (normalizado.length() > 120 || !CORREO.matcher(normalizado).matches()) {
             throw ApiException.datosInvalidos("El correo no es válido.");
         }

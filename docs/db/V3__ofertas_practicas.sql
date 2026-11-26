@@ -1,35 +1,36 @@
--- ============================================================
--- PRAXIS — V3__ofertas_practicas.sql  (PostgreSQL 15+)
--- Convocatorias empresariales con perfiles y plazas.
---
--- Principio: la empresa propone y recomienda; la UNIVERSIDAD (coordinador)
--- aprueba las ofertas y decide la aceptación de cada postulación.
--- Los triggers son una SEGUNDA barrera: la API debe autorizar igualmente.
---
--- No modifica V1 ni V2 como archivos. Cambios sobre objetos existentes:
---   * rol.chk_rol_codigo se amplía con REPRESENTANTE_EMPRESA
---   * practica.postulacion_id (nullable) enlaza la práctica con su postulación
---   * historial inmutable de cambios en perfiles, carreras y requisitos de ofertas
---
--- Contexto que el backend debe fijar en CADA transacción (set_config(..., true)):
---   praxis.usuario_id  -> usuario autenticado que ejecuta la operación
---   praxis.motivo      -> motivo de la operación (rechazos, cancelaciones, correcciones)
---   praxis.sistema     -> 'true' SOLO en procesos automáticos sin usuario (cierre de ofertas)
---   praxis.desvincular_postulacion -> 'true' solo en la operación administrativa explícita
---                                     que desvincula una práctica de su postulación
---   praxis.correccion_decision     -> 'true' solo en la operación administrativa (coordinador
---                                     o administrador, con praxis.motivo) que corrige una
---                                     postulación ya resuelta; queda en auditoria
---
--- Orden uniforme que DEBE respetar la API antes de ejecutar UPDATE sobre una postulación:
---   oferta_practica -> oferta_perfil -> postulacion
--- PostgreSQL bloquea la fila destino de postulacion antes de ejecutar su trigger BEFORE;
--- por eso el servicio debe bloquear oferta/perfil previamente para respetar este orden.
--- ============================================================
 
--- ============================================================
--- 0. ROL PARA USUARIOS DE EMPRESA QUE PUBLICAN OFERTAS
--- ============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ALTER TABLE rol DROP CONSTRAINT chk_rol_codigo;
 ALTER TABLE rol ADD CONSTRAINT chk_rol_codigo CHECK (codigo IN (
@@ -41,9 +42,9 @@ INSERT INTO rol (codigo, nombre, descripcion) VALUES
  'Publica y administra convocatorias de su empresa; recomienda postulantes')
 ON CONFLICT (codigo) DO NOTHING;
 
--- ============================================================
--- 1. FUNCIONES AUXILIARES DE IDENTIDAD Y PERMISOS
--- ============================================================
+
+
+
 
 CREATE OR REPLACE FUNCTION praxis_actor()
 RETURNS BIGINT AS $$
@@ -55,7 +56,7 @@ RETURNS BOOLEAN AS $$
     SELECT COALESCE(current_setting('praxis.sistema', TRUE), '') = 'true'
 $$ LANGUAGE sql STABLE;
 
--- usuario activo con un rol global concreto
+
 CREATE OR REPLACE FUNCTION tiene_rol_activo(p_usuario BIGINT, p_codigo TEXT)
 RETURNS BOOLEAN AS $$
     SELECT COALESCE((
@@ -72,9 +73,9 @@ RETURNS BOOLEAN AS $$
     SELECT tiene_rol_activo(p_usuario, 'COORDINADOR')
 $$ LANGUAGE sql STABLE;
 
--- ============================================================
--- 2. USUARIOS DE EMPRESA
--- ============================================================
+
+
+
 
 CREATE TABLE empresa_usuario (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -89,9 +90,9 @@ CREATE TABLE empresa_usuario (
 );
 CREATE INDEX idx_empresa_usuario_usuario ON empresa_usuario(usuario_id);
 
--- membresía EFECTIVA: usuario activo + rol global REPRESENTANTE_EMPRESA + membresía activa.
--- Se evalúa en cada operación, así un usuario que pierde el rol o se desactiva pierde permisos
--- aunque su fila de empresa_usuario siga marcada como activa.
+
+
+
 CREATE OR REPLACE FUNCTION empresa_membresia_id(p_usuario BIGINT, p_empresa BIGINT)
 RETURNS BIGINT AS $$
     SELECT eu.id
@@ -99,8 +100,8 @@ RETURNS BIGINT AS $$
       JOIN usuario u ON u.id = eu.usuario_id AND u.activo
      WHERE eu.usuario_id = p_usuario AND eu.empresa_id = p_empresa AND eu.activo
        AND EXISTS (SELECT 1 FROM usuario_rol ur JOIN rol r ON r.id = ur.rol_id
-                    WHERE ur.usuario_id = eu.usuario_id
-                      AND r.codigo = 'REPRESENTANTE_EMPRESA')
+        WHERE ur.usuario_id = eu.usuario_id
+        AND r.codigo = 'REPRESENTANTE_EMPRESA')
 $$ LANGUAGE sql STABLE;
 
 CREATE OR REPLACE FUNCTION empresa_rol_activo(p_usuario BIGINT, p_empresa BIGINT)
@@ -110,7 +111,7 @@ RETURNS VARCHAR AS $$
      WHERE eu.id = empresa_membresia_id(p_usuario, p_empresa)
 $$ LANGUAGE sql STABLE;
 
--- ADMIN_EMPRESA gestiona cualquier oferta de su empresa; PUBLICADOR solo las que creó
+
 CREATE OR REPLACE FUNCTION puede_gestionar_oferta(p_actor BIGINT, p_empresa BIGINT, p_creador BIGINT)
 RETURNS BOOLEAN AS $$
     SELECT COALESCE(
@@ -121,12 +122,12 @@ RETURNS BOOLEAN AS $$
         END, FALSE)
 $$ LANGUAGE sql STABLE;
 
--- ============================================================
--- 3. OFERTA (convocatoria), HISTORIAL, PERFILES Y REQUISITOS
--- ============================================================
+
+
+
 
 CREATE TABLE oferta_practica (
-    id                       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     empresa_id               BIGINT       NOT NULL REFERENCES empresa(id)           ON DELETE RESTRICT,
     convenio_id              BIGINT       NOT NULL,
     tipo_practica_id         BIGINT       NOT NULL REFERENCES tipo_practica(id)     ON DELETE RESTRICT,
@@ -135,16 +136,18 @@ CREATE TABLE oferta_practica (
     descripcion              TEXT,
     fecha_inicio_actividades DATE         NOT NULL,
     fecha_fin_actividades    DATE         NOT NULL,
-    fecha_cierre             DATE         NOT NULL,   -- último día para postular
-    horas_requeridas_snapshot NUMERIC(6,2),             -- congeladas al publicar la oferta
+    fecha_cierre             DATE         NOT NULL,   
+    horas_requeridas_snapshot NUMERIC(6,2),             
     nota_minima_snapshot      NUMERIC(4,2),
-    fecha_primera_publicacion TIMESTAMPTZ,            -- primera aprobación histórica
-    fecha_publicacion        TIMESTAMPTZ,             -- última publicación / republicación
+    fecha_primera_publicacion TIMESTAMPTZ,            
+    nota_minima_snapshot      NUMERIC(4,2),
+    fecha_primera_publicacion TIMESTAMPTZ,            
+    fecha_publicacion        TIMESTAMPTZ,             
     estado                   VARCHAR(20)  NOT NULL DEFAULT 'BORRADOR',
     creada_por_usuario_id    BIGINT       NOT NULL,
     resuelta_por_usuario_id  BIGINT       REFERENCES usuario(id) ON DELETE RESTRICT,
     fecha_resolucion         TIMESTAMPTZ,
-    motivo_decision          TEXT,                    -- motivo de la ÚLTIMA transición
+    motivo_decision          TEXT,        
     created_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
@@ -220,7 +223,7 @@ CREATE TABLE oferta_perfil (
 );
 CREATE INDEX idx_perfil_oferta ON oferta_perfil(oferta_id);
 
--- Carreras a las que va dirigido el perfil (sin filas = abierto a todas)
+
 CREATE TABLE oferta_perfil_carrera (
     perfil_id  BIGINT      NOT NULL REFERENCES oferta_perfil(id) ON DELETE CASCADE,
     carrera_id BIGINT      NOT NULL REFERENCES carrera(id)       ON DELETE RESTRICT,
@@ -229,7 +232,7 @@ CREATE TABLE oferta_perfil_carrera (
 );
 CREATE INDEX idx_perfil_carrera_carrera ON oferta_perfil_carrera(carrera_id);
 
--- Requisitos laborales del perfil (independientes de la tabla requisito académica)
+
 CREATE TABLE oferta_perfil_requisito (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     perfil_id   BIGINT      NOT NULL REFERENCES oferta_perfil(id) ON DELETE CASCADE,
@@ -241,10 +244,10 @@ CREATE TABLE oferta_perfil_requisito (
 );
 CREATE INDEX idx_perfil_req_perfil ON oferta_perfil_requisito(perfil_id);
 
--- ============================================================
--- 4. POSTULACIONES
---    Etapa empresarial (recomendación) separada de la decisión académica (estado).
--- ============================================================
+
+
+
+
 
 CREATE TABLE postulacion (
     id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -254,18 +257,16 @@ CREATE TABLE postulacion (
     mensaje           TEXT,
     fecha_postulacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    -- recomendación vigente de la empresa (el historial completo está aparte)
+    
     recomendacion_empresa           VARCHAR(20) NOT NULL DEFAULT 'SIN_EVALUAR',
     observacion_empresa             TEXT,
     evaluada_por_empresa_usuario_id BIGINT REFERENCES empresa_usuario(id) ON DELETE RESTRICT,
     fecha_evaluacion_empresa        TIMESTAMPTZ,
 
-    -- decisión académica (solo coordinador)
     resuelta_por      BIGINT      REFERENCES usuario(id) ON DELETE RESTRICT,
     fecha_resolucion  TIMESTAMPTZ,
     motivo_decision   TEXT,
 
-    -- cancelación de una aceptada
     cancelada_por     BIGINT      REFERENCES usuario(id) ON DELETE RESTRICT,
     fecha_cancelacion TIMESTAMPTZ,
 
@@ -297,13 +298,13 @@ CREATE TABLE postulacion (
         estado NOT IN ('RECHAZADA','CANCELADA')
         OR (motivo_decision IS NOT NULL AND length(btrim(motivo_decision)) > 0))
 );
--- Un estudiante no repite perfil: rechazado/aceptado/cancelado bloquean; retirada permite volver a postular
+
 CREATE UNIQUE INDEX uq_postulacion_perfil_estudiante
     ON postulacion(perfil_id, estudiante_id) WHERE estado <> 'RETIRADA';
 CREATE INDEX idx_postulacion_perfil_estado ON postulacion(perfil_id, estado);
 CREATE INDEX idx_postulacion_estudiante    ON postulacion(estudiante_id, estado);
 
--- Historial de recomendaciones empresariales (inmutable)
+
 CREATE TABLE postulacion_recomendacion_historial (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     postulacion_id      BIGINT      NOT NULL REFERENCES postulacion(id)     ON DELETE RESTRICT,
@@ -316,17 +317,19 @@ CREATE TABLE postulacion_recomendacion_historial (
 );
 CREATE INDEX idx_posthist_postulacion ON postulacion_recomendacion_historial(postulacion_id, fecha DESC);
 
--- ============================================================
--- 5. ENLACE practica -> postulacion
--- ============================================================
+
+
+
 
 ALTER TABLE practica
     ADD COLUMN postulacion_id BIGINT UNIQUE
-        REFERENCES postulacion(id) ON DELETE RESTRICT;   -- NULL = práctica directa, sin convocatoria
+        REFERENCES postulacion(id) ON DELETE RESTRICT;   
 
--- ============================================================
--- 6. VISTA DE CUPOS (el cierre del perfil se deriva, no se almacena)
--- ============================================================
+
+
+
+
+
 
 CREATE OR REPLACE VIEW v_oferta_perfil_cupo AS
 SELECT p.id AS perfil_id, p.oferta_id, p.nombre, p.plazas,
@@ -340,11 +343,12 @@ SELECT p.id AS perfil_id, p.oferta_id, p.nombre, p.plazas,
   LEFT JOIN postulacion po ON po.perfil_id = p.id
  GROUP BY p.id, p.oferta_id, p.nombre, p.plazas;
 
--- ============================================================
--- 7. TRIGGERS
--- ============================================================
 
--- 7.1 updated_at
+
+
+
+
+
 CREATE TRIGGER trg_empresa_usuario_updated BEFORE UPDATE ON empresa_usuario
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_oferta_practica_updated BEFORE UPDATE ON oferta_practica
@@ -356,11 +360,11 @@ CREATE TRIGGER trg_oferta_perfil_requisito_updated BEFORE UPDATE ON oferta_perfi
 CREATE TRIGGER trg_postulacion_updated BEFORE UPDATE ON postulacion
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- 7.2 empresa_usuario
---     * solo coordinador/administrador o ADMIN_EMPRESA de esa empresa administra miembros
---     * toda membresía activa exige usuario activo y rol REPRESENTANTE_EMPRESA
---     * el primer miembro activo de una empresa debe ser ADMIN_EMPRESA
---     * la empresa nunca queda sin ADMIN_EMPRESA activo
+
+
+
+
+
 CREATE OR REPLACE FUNCTION validar_empresa_usuario()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -401,8 +405,8 @@ BEGIN
         -- primer miembro activo = administrador
         IF NEW.rol_empresa <> 'ADMIN_EMPRESA'
            AND NOT EXISTS (SELECT 1 FROM empresa_usuario
-                            WHERE empresa_id = NEW.empresa_id AND id IS DISTINCT FROM NEW.id
-                              AND activo) THEN
+        WHERE empresa_id = NEW.empresa_id AND id IS DISTINCT FROM NEW.id
+        AND activo) THEN
             RAISE EXCEPTION 'El primer usuario activo de una empresa debe ser ADMIN_EMPRESA';
         END IF;
     END IF;
@@ -412,8 +416,8 @@ BEGIN
        AND (NOT NEW.activo OR NEW.rol_empresa <> 'ADMIN_EMPRESA')
        AND v_empresa_activa THEN
         IF NOT EXISTS (SELECT 1 FROM empresa_usuario
-                        WHERE empresa_id = NEW.empresa_id AND id <> NEW.id
-                          AND activo AND rol_empresa = 'ADMIN_EMPRESA') THEN
+        WHERE empresa_id = NEW.empresa_id AND id <> NEW.id
+        AND activo AND rol_empresa = 'ADMIN_EMPRESA') THEN
             RAISE EXCEPTION 'La empresa no puede quedar sin un ADMIN_EMPRESA activo';
         END IF;
     END IF;
@@ -444,8 +448,8 @@ CREATE TRIGGER trg_auditar_empresa_usuario
     AFTER INSERT OR UPDATE ON empresa_usuario
     FOR EACH ROW EXECUTE FUNCTION auditar_empresa_usuario();
 
--- 7.3 oferta_practica: autorización por acción, cambios sustanciales,
---     estados y revalidaciones
+
+
 CREATE OR REPLACE FUNCTION validar_oferta()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -520,8 +524,8 @@ BEGIN
     IF v_sustancial THEN
         IF OLD.tipo_practica_id IS DISTINCT FROM NEW.tipo_practica_id
            AND EXISTS (SELECT 1 FROM oferta_perfil p
-                        JOIN postulacion po ON po.perfil_id = p.id
-                       WHERE p.oferta_id = OLD.id) THEN
+        JOIN postulacion po ON po.perfil_id = p.id
+        WHERE p.oferta_id = OLD.id) THEN
             RAISE EXCEPTION
                 'No se puede cambiar el tipo de práctica cuando ya existen postulaciones; cree una nueva oferta';
         END IF;
@@ -618,8 +622,8 @@ BEGIN
         -- Congelar horas y nota mínima del catálogo al publicar. Si ya hay postulaciones,
         -- se conserva el snapshot original aunque el catálogo haya cambiado después.
         IF NOT EXISTS (SELECT 1 FROM oferta_perfil p
-                        JOIN postulacion po ON po.perfil_id = p.id
-                       WHERE p.oferta_id = NEW.id) THEN
+        JOIN postulacion po ON po.perfil_id = p.id
+        WHERE p.oferta_id = NEW.id) THEN
             SELECT horas_requeridas, nota_minima
               INTO v_tipo_horas, v_tipo_nota
               FROM tipo_practica WHERE id = NEW.tipo_practica_id;
@@ -661,7 +665,7 @@ BEGIN
         NEW.resuelta_por_usuario_id := v_actor;
         NEW.fecha_resolucion := NOW();
         IF NEW.estado = 'PUBLICADA' THEN
-            NEW.fecha_publicacion        := NOW();                                   -- última (re)publicación
+            NEW.fecha_publicacion        := NOW();        -- última (re)publicación
             NEW.fecha_primera_publicacion := COALESCE(OLD.fecha_primera_publicacion, NOW());
         END IF;
     ELSIF NEW.estado = 'CERRADA' THEN
@@ -696,19 +700,19 @@ BEGIN
         INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
         VALUES (praxis_actor(), 'OFERTA_CABECERA_MODIFICADA', 'oferta_practica', NEW.id,
                 jsonb_build_object('antes', jsonb_build_object(
-                    'titulo', OLD.titulo, 'descripcion', OLD.descripcion,
-                    'tipo_practica_id', OLD.tipo_practica_id, 'periodo_id', OLD.periodo_id,
-                    'convenio_id', OLD.convenio_id, 'fecha_inicio_actividades', OLD.fecha_inicio_actividades,
-                    'fecha_fin_actividades', OLD.fecha_fin_actividades, 'fecha_cierre', OLD.fecha_cierre,
-                    'horas_requeridas_snapshot', OLD.horas_requeridas_snapshot,
-                    'nota_minima_snapshot', OLD.nota_minima_snapshot),
-                    'despues', jsonb_build_object(
-                    'titulo', NEW.titulo, 'descripcion', NEW.descripcion,
-                    'tipo_practica_id', NEW.tipo_practica_id, 'periodo_id', NEW.periodo_id,
-                    'convenio_id', NEW.convenio_id, 'fecha_inicio_actividades', NEW.fecha_inicio_actividades,
-                    'fecha_fin_actividades', NEW.fecha_fin_actividades, 'fecha_cierre', NEW.fecha_cierre,
-                    'horas_requeridas_snapshot', NEW.horas_requeridas_snapshot,
-                    'nota_minima_snapshot', NEW.nota_minima_snapshot)));
+        'titulo', OLD.titulo, 'descripcion', OLD.descripcion,
+        'tipo_practica_id', OLD.tipo_practica_id, 'periodo_id', OLD.periodo_id,
+        'convenio_id', OLD.convenio_id, 'fecha_inicio_actividades', OLD.fecha_inicio_actividades,
+        'fecha_fin_actividades', OLD.fecha_fin_actividades, 'fecha_cierre', OLD.fecha_cierre,
+        'horas_requeridas_snapshot', OLD.horas_requeridas_snapshot,
+        'nota_minima_snapshot', OLD.nota_minima_snapshot),
+        'despues', jsonb_build_object(
+        'titulo', NEW.titulo, 'descripcion', NEW.descripcion,
+        'tipo_practica_id', NEW.tipo_practica_id, 'periodo_id', NEW.periodo_id,
+        'convenio_id', NEW.convenio_id, 'fecha_inicio_actividades', NEW.fecha_inicio_actividades,
+        'fecha_fin_actividades', NEW.fecha_fin_actividades, 'fecha_cierre', NEW.fecha_cierre,
+        'horas_requeridas_snapshot', NEW.horas_requeridas_snapshot,
+        'nota_minima_snapshot', NEW.nota_minima_snapshot)));
     END IF;
     RETURN NULL;
 END $$ LANGUAGE plpgsql;
@@ -717,7 +721,7 @@ CREATE TRIGGER trg_auditar_cambios_cabecera_oferta
     AFTER UPDATE ON oferta_practica
     FOR EACH ROW EXECUTE FUNCTION auditar_cambios_cabecera_oferta();
 
--- 7.4 oferta_practica: no se borra (se cancela)
+
 CREATE OR REPLACE FUNCTION proteger_borrado_oferta()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -728,7 +732,7 @@ CREATE TRIGGER trg_proteger_borrado_oferta
     BEFORE DELETE ON oferta_practica
     FOR EACH ROW EXECUTE FUNCTION proteger_borrado_oferta();
 
--- 7.5 oferta_estado_historial: automático, con responsable obligatorio; inmutable
+
 CREATE OR REPLACE FUNCTION registrar_historial_oferta()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -747,7 +751,7 @@ BEGIN
                 'Cambio de estado de oferta sin responsable: fije praxis.usuario_id (o praxis.sistema)';
         END IF;
         v_motivo := COALESCE(NULLIF(btrim(NEW.motivo_decision), ''),
-                             NULLIF(current_setting('praxis.motivo', TRUE), ''));
+        NULLIF(current_setting('praxis.motivo', TRUE), ''));
         INSERT INTO oferta_estado_historial
             (oferta_id, estado_anterior, estado_nuevo, usuario_id, es_sistema, motivo)
         VALUES (NEW.id, OLD.estado, NEW.estado, v_usuario, v_usuario IS NULL, v_motivo);
@@ -772,11 +776,11 @@ CREATE TRIGGER trg_proteger_historial_recomendacion
     BEFORE UPDATE OR DELETE ON postulacion_recomendacion_historial
     FOR EACH ROW EXECUTE FUNCTION proteger_historial_inmutable();
 
--- 7.6 perfiles, carreras y requisitos (BEFORE: bloquea la oferta ANTES de tocar la fila hija)
---     * perfil_id / oferta_id inmutables
---     * solo editables en BORRADOR / RECHAZADA / PUBLICADA, por la empresa autorizada
---     * si la oferta está PUBLICADA, el cambio la devuelve a PENDIENTE_REVISION
---     * las carreras asignadas deben estar activas
+
+
+
+
+
 CREATE OR REPLACE FUNCTION oferta_hijo_modificado()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -794,11 +798,11 @@ BEGIN
             v_oferta := NEW.oferta_id;
             IF TG_OP = 'UPDATE' THEN
                 IF NEW.oferta_id IS DISTINCT FROM OLD.oferta_id THEN
-                    RAISE EXCEPTION 'Un perfil no puede cambiar de oferta';
+        RAISE EXCEPTION 'Un perfil no puede cambiar de oferta';
                 END IF;
                 IF (OLD.nombre, OLD.descripcion, OLD.plazas)
                    IS NOT DISTINCT FROM (NEW.nombre, NEW.descripcion, NEW.plazas) THEN
-                    RETURN NEW;
+        RETURN NEW;
                 END IF;
             END IF;
         END IF;
@@ -865,11 +869,11 @@ CREATE TRIGGER trg_oferta_perfil_requisito_modificado
     BEFORE INSERT OR UPDATE OR DELETE ON oferta_perfil_requisito
     FOR EACH ROW EXECUTE FUNCTION oferta_hijo_modificado();
 
--- Historial de cambios sustanciales de perfiles, carreras y requisitos.
--- Permite reconstruir las condiciones de una convocatoria, incluso tras republicarla.
+
+
 CREATE TABLE oferta_perfil_cambio_historial (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    oferta_id   BIGINT REFERENCES oferta_practica(id) ON DELETE RESTRICT, -- NULL solo si el hijo se elimina en cascada
+    oferta_id   BIGINT REFERENCES oferta_practica(id) ON DELETE RESTRICT, 
     perfil_id   BIGINT,
     tabla       VARCHAR(40) NOT NULL,
     operacion   VARCHAR(10) NOT NULL,
@@ -898,8 +902,8 @@ BEGIN
     IF TG_OP = 'DELETE' THEN
         v_antes := to_jsonb(OLD);
         v_id := CASE WHEN TG_TABLE_NAME = 'oferta_perfil' THEN OLD.id
-                     WHEN TG_TABLE_NAME = 'oferta_perfil_carrera' THEN NULL
-                     ELSE OLD.id END;
+        WHEN TG_TABLE_NAME = 'oferta_perfil_carrera' THEN NULL
+        ELSE OLD.id END;
         IF TG_TABLE_NAME = 'oferta_perfil' THEN
             v_perfil := OLD.id; v_oferta := OLD.oferta_id;
         ELSE
@@ -945,8 +949,8 @@ CREATE TRIGGER trg_inmutable_hist_oferta_perfil
     BEFORE UPDATE OR DELETE ON oferta_perfil_cambio_historial
     FOR EACH ROW EXECUTE FUNCTION proteger_historial_inmutable();
 
--- 7.7 oferta_perfil: no reducir plazas bajo las ya aceptadas
---     (un perfil con postulaciones no puede eliminarse: FK RESTRICT en postulacion)
+
+
 CREATE OR REPLACE FUNCTION validar_perfil_plazas()
 RETURNS TRIGGER AS $$
 DECLARE v_aceptadas INT;
@@ -968,7 +972,7 @@ CREATE TRIGGER trg_validar_perfil_plazas
     BEFORE UPDATE ON oferta_perfil
     FOR EACH ROW EXECUTE FUNCTION validar_perfil_plazas();
 
--- 7.8 postulacion: identidad del actor, recomendación, decisión académica, cupos
+
 CREATE OR REPLACE FUNCTION validar_postulacion()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -1023,7 +1027,7 @@ BEGIN
             RAISE EXCEPTION 'Una postulación nueva debe iniciar PENDIENTE y SIN_EVALUAR';
         END IF;
         IF NOT EXISTS (SELECT 1 FROM estudiante e JOIN usuario u ON u.id = e.usuario_id
-                        WHERE e.id = NEW.estudiante_id AND e.usuario_id = v_actor AND u.activo) THEN
+        WHERE e.id = NEW.estudiante_id AND e.usuario_id = v_actor AND u.activo) THEN
             RAISE EXCEPTION 'Solo el propio estudiante autenticado puede postularse';
         END IF;
         IF v_estado_of IS DISTINCT FROM 'PUBLICADA' THEN
@@ -1054,7 +1058,7 @@ BEGIN
         END IF;
         IF EXISTS (SELECT 1 FROM oferta_perfil_carrera WHERE perfil_id = NEW.perfil_id)
            AND NOT EXISTS (SELECT 1 FROM oferta_perfil_carrera
-                            WHERE perfil_id = NEW.perfil_id AND carrera_id = v_carrera) THEN
+        WHERE perfil_id = NEW.perfil_id AND carrera_id = v_carrera) THEN
             RAISE EXCEPTION 'El perfil no está dirigido a la carrera del estudiante';
         END IF;
 
@@ -1095,13 +1099,13 @@ BEGIN
                    (NEW.motivo_decision, NEW.cancelada_por, NEW.fecha_cancelacion)) THEN
             IF NOT v_correccion OR NEW.estado <> OLD.estado THEN
                 RAISE EXCEPTION
-                    'Postulación % ya resuelta: sus datos de decisión no se modifican (use la corrección administrativa auditada)',
-                    OLD.estado;
+        'Postulación % ya resuelta: sus datos de decisión no se modifican (use la corrección administrativa auditada)',
+        OLD.estado;
             END IF;
             INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
             VALUES (v_actor, 'POSTULACION_CORRECCION_ADMIN', 'postulacion', NEW.id,
-                    jsonb_build_object('antes', to_jsonb(OLD), 'despues', to_jsonb(NEW),
-                                       'motivo', current_setting('praxis.motivo', TRUE)));
+        jsonb_build_object('antes', to_jsonb(OLD), 'despues', to_jsonb(NEW),
+        'motivo', current_setting('praxis.motivo', TRUE)));
         END IF;
         IF NEW.estado = OLD.estado THEN RETURN NEW; END IF;
     ELSE
@@ -1112,9 +1116,9 @@ BEGIN
                OR OLD.recomendacion_empresa <> 'SIN_EVALUAR'
                OR NOT EXISTS (
                    SELECT 1 FROM estudiante e JOIN usuario u ON u.id = e.usuario_id
-                    WHERE e.id = OLD.estudiante_id AND e.usuario_id = v_actor AND u.activo) THEN
+        WHERE e.id = OLD.estudiante_id AND e.usuario_id = v_actor AND u.activo) THEN
                 RAISE EXCEPTION
-                    'Solo el estudiante propietario puede editar el mensaje antes de la evaluación empresarial';
+        'Solo el estudiante propietario puede editar el mensaje antes de la evaluación empresarial';
             END IF;
         END IF;
         IF NEW.estado = OLD.estado
@@ -1141,7 +1145,7 @@ BEGIN
             IF OLD.recomendacion_empresa <> 'SIN_EVALUAR'
                AND NEW.recomendacion_empresa = 'SIN_EVALUAR' THEN
                 RAISE EXCEPTION
-                    'Una recomendación registrada no puede borrarse ni restablecerse a SIN_EVALUAR';
+        'Una recomendación registrada no puede borrarse ni restablecerse a SIN_EVALUAR';
             END IF;
             IF NEW.recomendacion_empresa = 'SIN_EVALUAR' THEN
                 RAISE EXCEPTION 'La recomendación debe ser RECOMENDADO o NO_RECOMENDADO';
@@ -1150,7 +1154,7 @@ BEGIN
             IF v_membresia IS NULL
                OR NEW.evaluada_por_empresa_usuario_id IS DISTINCT FROM v_membresia THEN
                 RAISE EXCEPTION
-                    'El evaluador debe ser el usuario autenticado, miembro activo de la empresa de la oferta';
+        'El evaluador debe ser el usuario autenticado, miembro activo de la empresa de la oferta';
             END IF;
             NEW.fecha_evaluacion_empresa := NOW();
         END IF;
@@ -1176,7 +1180,7 @@ BEGIN
     -- RETIRADA: únicamente el estudiante propietario
     IF NEW.estado = 'RETIRADA' THEN
         IF NOT EXISTS (SELECT 1 FROM estudiante e JOIN usuario u ON u.id = e.usuario_id
-                        WHERE e.id = NEW.estudiante_id AND e.usuario_id = v_actor AND u.activo) THEN
+        WHERE e.id = NEW.estudiante_id AND e.usuario_id = v_actor AND u.activo) THEN
             RAISE EXCEPTION 'Solo el estudiante propietario puede retirar su postulación';
         END IF;
     END IF;
@@ -1201,8 +1205,8 @@ BEGIN
             RAISE EXCEPTION 'Solo un COORDINADOR activo puede cancelar una postulación aceptada';
         END IF;
         IF EXISTS (SELECT 1 FROM practica
-                    WHERE postulacion_id = NEW.id
-                      AND estado NOT IN ('CANCELADA','RECHAZADA')) THEN
+        WHERE postulacion_id = NEW.id
+        AND estado NOT IN ('CANCELADA','RECHAZADA')) THEN
             RAISE EXCEPTION 'Resuelva primero la práctica asociada (debe estar CANCELADA o RECHAZADA)';
         END IF;
         NEW.cancelada_por := v_actor;
@@ -1239,10 +1243,10 @@ BEGIN
 
         -- el estudiante no puede tener otra práctica viva en el mismo periodo
         IF EXISTS (SELECT 1 FROM practica
-                    WHERE estudiante_id = NEW.estudiante_id
-                      AND periodo_id = v_periodo
-                      AND estado NOT IN ('RECHAZADA','CANCELADA','REPROBADA')
-                      AND postulacion_id IS DISTINCT FROM NEW.id) THEN
+        WHERE estudiante_id = NEW.estudiante_id
+        AND periodo_id = v_periodo
+        AND estado NOT IN ('RECHAZADA','CANCELADA','REPROBADA')
+        AND postulacion_id IS DISTINCT FROM NEW.id) THEN
             RAISE EXCEPTION 'El estudiante ya tiene una práctica activa en este periodo';
         END IF;
     END IF;
@@ -1254,7 +1258,7 @@ CREATE TRIGGER trg_validar_postulacion
     BEFORE INSERT OR UPDATE ON postulacion
     FOR EACH ROW EXECUTE FUNCTION validar_postulacion();
 
--- 7.9 postulacion: auditoría de cada transición (actor siempre identificado)
+
 CREATE OR REPLACE FUNCTION auditar_postulacion()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -1264,7 +1268,7 @@ BEGIN
     INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
     VALUES (praxis_actor(), 'POSTULACION_' || NEW.estado, 'postulacion', NEW.id,
             jsonb_build_object('estado_anterior', OLD.estado, 'estado_nuevo', NEW.estado,
-                               'motivo', NEW.motivo_decision));
+        'motivo', NEW.motivo_decision));
     RETURN NULL;
 END $$ LANGUAGE plpgsql;
 
@@ -1283,8 +1287,8 @@ BEGIN
     INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
     VALUES (praxis_actor(), 'POSTULACION_CREADA', 'postulacion', NEW.id,
             jsonb_build_object('perfil_id', NEW.perfil_id,
-                               'estudiante_id', NEW.estudiante_id,
-                               'fecha_postulacion', NEW.fecha_postulacion));
+        'estudiante_id', NEW.estudiante_id,
+        'fecha_postulacion', NEW.fecha_postulacion));
     RETURN NULL;
 END $$ LANGUAGE plpgsql;
 
@@ -1292,7 +1296,7 @@ CREATE TRIGGER trg_auditar_creacion_postulacion
     AFTER INSERT ON postulacion
     FOR EACH ROW EXECUTE FUNCTION auditar_creacion_postulacion();
 
--- 7.10 historial de recomendaciones empresariales
+
 CREATE OR REPLACE FUNCTION registrar_recomendacion_historial()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -1306,19 +1310,19 @@ END $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_registrar_recomendacion_historial
     AFTER UPDATE OF recomendacion_empresa, observacion_empresa ON postulacion
     FOR EACH ROW WHEN (NEW.recomendacion_empresa <> 'SIN_EVALUAR'
-                       AND (OLD.recomendacion_empresa, OLD.observacion_empresa)
-                           IS DISTINCT FROM (NEW.recomendacion_empresa, NEW.observacion_empresa))
+        AND (OLD.recomendacion_empresa, OLD.observacion_empresa)
+        IS DISTINCT FROM (NEW.recomendacion_empresa, NEW.observacion_empresa))
     EXECUTE FUNCTION registrar_recomendacion_historial();
 
--- 7.11 al aceptar la última plaza de TODOS los perfiles, la oferta pasa a CERRADA
---      (si queda algún perfil con plazas, la oferta continúa publicada)
+
+
 CREATE OR REPLACE FUNCTION cerrar_oferta_si_completa()
 RETURNS TRIGGER AS $$
 DECLARE v_oferta BIGINT;
 BEGIN
     SELECT oferta_id INTO v_oferta FROM oferta_perfil WHERE id = NEW.perfil_id;
     IF NOT EXISTS (SELECT 1 FROM v_oferta_perfil_cupo
-                    WHERE oferta_id = v_oferta AND NOT perfil_cerrado) THEN
+        WHERE oferta_id = v_oferta AND NOT perfil_cerrado) THEN
         UPDATE oferta_practica
            SET estado = 'CERRADA',
                motivo_decision = 'Todas las plazas de la convocatoria fueron cubiertas'
@@ -1332,8 +1336,8 @@ CREATE TRIGGER trg_cerrar_oferta_si_completa
     FOR EACH ROW WHEN (NEW.estado = 'ACEPTADA' AND OLD.estado IS DISTINCT FROM NEW.estado)
     EXECUTE FUNCTION cerrar_oferta_si_completa();
 
--- 7.12 una postulación ACEPTADA debe tener su práctica en la MISMA transacción,
---      y esa práctica no puede estar ya cancelada/rechazada (se verifica al COMMIT)
+
+
 CREATE OR REPLACE FUNCTION verificar_postulacion_con_practica()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -1350,7 +1354,7 @@ BEGIN
                 'La postulación % está ACEPTADA pero no tiene práctica: créela en la misma transacción', v_pid;
         END IF;
         IF EXISTS (SELECT 1 FROM practica
-                    WHERE postulacion_id = v_pid AND estado IN ('CANCELADA','RECHAZADA')) THEN
+        WHERE postulacion_id = v_pid AND estado IN ('CANCELADA','RECHAZADA')) THEN
             RAISE EXCEPTION
                 'La postulación % sigue ACEPTADA con su práctica cancelada/rechazada: cancélela en la misma operación', v_pid;
         END IF;
@@ -1368,7 +1372,7 @@ CREATE CONSTRAINT TRIGGER trg_practica_mantiene_postulacion
     DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW EXECUTE FUNCTION verificar_postulacion_con_practica();
 
--- 7.13 practica: consistencia con la postulación/oferta de origen y vínculo protegido
+
 CREATE OR REPLACE FUNCTION validar_practica_postulacion()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -1394,15 +1398,15 @@ BEGIN
             IF COALESCE(current_setting('praxis.desvincular_postulacion', TRUE), '') <> 'true'
                OR praxis_actor() IS NULL
                OR NOT (tiene_rol_activo(praxis_actor(), 'COORDINADOR')
-                       OR tiene_rol_activo(praxis_actor(), 'ADMINISTRADOR'))
+        OR tiene_rol_activo(praxis_actor(), 'ADMINISTRADOR'))
                OR NULLIF(btrim(current_setting('praxis.motivo', TRUE)), '') IS NULL THEN
                 RAISE EXCEPTION
-                    'Desvincular exige coordinador/administrador activo, contexto explícito y motivo';
+        'Desvincular exige coordinador/administrador activo, contexto explícito y motivo';
             END IF;
             INSERT INTO auditoria (usuario_id, accion, entidad, entidad_id, detalle)
             VALUES (praxis_actor(), 'PRACTICA_DESVINCULA_POSTULACION', 'practica', OLD.id,
-                    jsonb_build_object('postulacion_id', OLD.postulacion_id,
-                                       'motivo', current_setting('praxis.motivo', TRUE)));
+        jsonb_build_object('postulacion_id', OLD.postulacion_id,
+        'motivo', current_setting('praxis.motivo', TRUE)));
         END IF;
     END IF;
 
@@ -1445,10 +1449,10 @@ END $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_validar_practica_postulacion
     BEFORE INSERT OR UPDATE OF postulacion_id, estudiante_id, empresa_id,
-                               convenio_id, tipo_practica_id, periodo_id ON practica
+        convenio_id, tipo_practica_id, periodo_id ON practica
     FOR EACH ROW EXECUTE FUNCTION validar_practica_postulacion();
 
--- 7.14 práctica cancelada/rechazada -> su postulación ACEPTADA pasa a CANCELADA (misma operación)
+
 CREATE OR REPLACE FUNCTION sincronizar_postulacion_con_practica()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -1456,7 +1460,7 @@ BEGIN
     UPDATE postulacion
        SET estado = 'CANCELADA',
            motivo_decision = COALESCE(NULLIF(current_setting('praxis.motivo', TRUE), ''),
-                                      'Práctica ' || lower(NEW.estado))
+        'Práctica ' || lower(NEW.estado))
      WHERE id = NEW.postulacion_id AND estado = 'ACEPTADA';
     PERFORM set_config('praxis.sync_practica', '', TRUE);
     RETURN NULL;
@@ -1465,15 +1469,15 @@ END $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_sincronizar_postulacion_practica
     AFTER UPDATE OF estado ON practica
     FOR EACH ROW WHEN (NEW.postulacion_id IS NOT NULL
-                       AND NEW.estado IN ('CANCELADA','RECHAZADA')
-                       AND OLD.estado IS DISTINCT FROM NEW.estado)
+        AND NEW.estado IN ('CANCELADA','RECHAZADA')
+        AND OLD.estado IS DISTINCT FROM NEW.estado)
     EXECUTE FUNCTION sincronizar_postulacion_con_practica();
 
--- ============================================================
--- 8. PROCESO AUTOMÁTICO: cierre de ofertas vencidas
---    El backend lo invoca periódicamente: SELECT cerrar_ofertas_vencidas();
---    Queda identificado como operación del SISTEMA en el historial.
--- ============================================================
+
+
+
+
+
 
 CREATE OR REPLACE FUNCTION cerrar_ofertas_vencidas()
 RETURNS INT AS $$

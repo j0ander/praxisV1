@@ -27,7 +27,7 @@ La información de las prácticas (estudiantes, empresas, convenios, ofertas, po
 
 | Rol | Propósito y responsabilidad general |
 | :--- | :--- |
-| **Administrador** | Gestiona usuarios, roles, permisos y estructura académica. |
+| **Administrador** | Gestiona usuarios, roles como datos de dominio y estructura académica. |
 | **Estudiante** | Consulta ofertas, se postula y participa en el seguimiento de su práctica. |
 | **Coordinador** | Gestiona empresas y ofertas, revisa postulaciones, selecciona estudiantes, asigna docentes tutores y controla el avance. |
 | **Docente tutor** | Supervisa académicamente al estudiante: revisa actividades y horas, registra observaciones y evalúa. |
@@ -35,15 +35,15 @@ La información de las prácticas (estudiantes, empresas, convenios, ofertas, po
 | **Representante empresarial** | Administra los datos de su empresa y registra ofertas para revisión. |
 | **Autoridad** | Consulta reportes e información consolidada para apoyar la toma de decisiones. |
 
-> *Nota: El acceso depende del rol y puede limitarse a una carrera o unidad académica, o ser institucional.*
+> *Nota: los roles, carreras y facultades se conservan como datos de dominio. El login básico permite filtrar menús y rutas en React, pero no hay autorización en la API ni limitación real por rol o unidad académica (`SEGURIDAD.md`).*
 
-> *Precisión del MVP (CR-5, CR-6 y CR-8): la tabla anterior describe la visión completa del producto. En el MVP la administración de usuarios y estructura académica corresponde solo al administrador; el coordinador no la administra. El tutor empresarial no recomienda postulaciones: lo hace el representante de su empresa. La autoridad solo consulta auditoría. La definición y administración de requisitos queda fuera del MVP, aunque la validación de postulación sí se aplica sobre los requisitos existentes. La asignación de tutores y fechas sí está incluida; la transición a `EN_CURSO` y las etapas posteriores no.*
+> *Precisión del MVP (CR-6 y CR-8): la tabla anterior describe la visión completa del producto. CR-5 no está vigente como autorización: el login básico solo filtra pantallas en React; los roles, carreras y facultades se conservan como datos de dominio y las operaciones REST se rigen por reglas de negocio. La definición y administración de requisitos queda fuera del MVP, aunque la validación de postulación sí se aplica sobre los requisitos existentes. La asignación de tutores y fechas sí está incluida; la transición a `EN_CURSO` y las etapas posteriores no.*
 
 ## 5. Alcance del MVP
 
 La primera versión cubre la organización institucional y el proceso previo al inicio de las prácticas:
 
-- **Usuarios y acceso:** registro, autenticación, roles y control de acceso.
+- **Usuarios:** registro y administración de datos; roles y carreras como datos de dominio. Login básico de prototipo para filtrar pantallas; sin autorización en la API (`SEGURIDAD.md`).
 - **Estructura académica:** facultades, carreras y periodos.
 - **Empresas y convenios:** empresas, representantes y convenios.
 - **Perfiles de estudiantes:** datos personales y académicos.
@@ -59,7 +59,7 @@ La validación de requisitos en la postulación se realiza sobre los requisitos 
 
 Capacidades del sistema en su visión completa, sin detallar requisitos:
 
-1. **Administración institucional:** usuarios, roles, permisos, facultades, carreras y periodos.
+1. **Administración institucional:** usuarios, roles como datos de dominio, facultades, carreras y periodos. El menú por rol es solo visual; los permisos en la API no están vigentes.
 2. **Requisitos académicos:** definición y verificación de las condiciones para participar.
 3. **Gestión empresarial:** empresas, representantes, tutores y convenios.
 4. **Ofertas:** registro, revisión, aprobación y publicación.

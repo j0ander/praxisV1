@@ -11,7 +11,7 @@ El MVP cubre: usuarios y acceso, estructura académica, perfiles, empresas y con
 | Fase | Nombre | Tareas |
 |---|---|---|
 | 1 | Preparación y base técnica | TK-001 a TK-005 |
-| 2 | Seguridad y acceso | TK-006 a TK-010 |
+| 2 | Seguridad y acceso (sin vigencia; pendiente a futuro) | TK-006 a TK-010 |
 | 3 | Estructura académica | TK-011 a TK-014 |
 | 4 | Usuarios y perfiles | TK-015 a TK-017 |
 | 5 | Empresas y convenios | TK-018 a TK-020 |
@@ -23,6 +23,8 @@ El MVP cubre: usuarios y acceso, estructura académica, perfiles, empresas y con
 ## 3. Tareas
 
 Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
+
+**Nota de vigencia.** La aplicación no tiene autenticación, sesión, cookies ni autorización por rol o ámbito. Las referencias a roles, carreras o empresa en tareas académicas son **datos de dominio o reglas de negocio**, no permisos aplicados por la API ni por la interfaz. Las tareas y criterios de seguridad (Fase 2, TK-004 y la parte de seguridad de TK-034) están marcados como no vigentes y conservan sus identificadores solo por trazabilidad.
 
 ### Fase 1. Preparación y base técnica
 
@@ -61,93 +63,46 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
   - Un conflicto de `version` o de plaza ocupada se traduce a 409 `CONFLICTO_CONCURRENCIA`.
   - Ninguna respuesta incluye SQL, trazas ni rutas internas.
 
-### TK-004 Contexto de sesión para los triggers
-- **Descripción:** fijar `praxis.usuario_id`, `praxis.motivo` y `praxis.sistema` dentro de cada transacción de escritura.
-- **Documentos:** `MODELO_DATOS.md` §7.3, `ARQUITECTURA.md` §7 y §12, `SEGURIDAD.md`.
-- **Dependencias:** TK-007.
-- **Resultado esperado:** mecanismo reutilizable por todos los Services.
-- **Criterios de aceptación:**
-  - Una operación auditable sin usuario autenticado es rechazada.
-  - El valor existe solo dentro de la transacción (`set_config(..., true)`).
-  - Rechazos y cancelaciones registran su motivo.
-  - No se escriben directamente las columnas gestionadas por triggers.
+### TK-004 Contexto de sesión para los triggers (no vigente; eliminada)
+- **Estado:** eliminada y pendiente a futuro. La aplicación ya no fija `praxis.usuario_id`, `praxis.motivo` ni `praxis.sistema`.
+- **Consecuencia:** los triggers que leen `praxis.usuario_id` pueden rechazar escrituras; ver `CONTEXTO_ACTOR.md`.
+- **Documentos:** `MODELO_DATOS.md` §7.3, `ARQUITECTURA.md` §7 y §12, `CONTEXTO_ACTOR.md`.
+- **No se escriben** directamente las columnas gestionadas por triggers. El esquema no se modifica.
 
 ### TK-005 Base del frontend
-- **Descripción:** configurar React + Vite en `src/main/webui`: estructura de la aplicación, rutas, cliente HTTP, manejo de 401, guardia de rutas por rol y estados comunes.
+- **Descripción:** configurar React + Vite en `src/main/webui`: estructura de la aplicación, rutas, cliente HTTP y estados comunes.
 - **Documentos:** `INTERFACES.md` §1, §2, §8, §9; `ARQUITECTURA.md`.
 - **Dependencias:** TK-001.
-- **Resultado esperado:** esqueleto navegable con menú por rol.
+- **Resultado esperado:** esqueleto navegable con menú institucional único.
 - **Criterios de aceptación:**
-  - Una ruta sin sesión redirige a `/login`.
-  - El menú muestra solo las opciones del rol, y la API sigue autorizando.
+  - No hay manejo de 401, guardias de ruta ni redirección a `/login`: no existe sesión ni autorización por rol.
   - Los estados de la sección 8 de `INTERFACES.md` están disponibles como componentes.
-  - El diseño respeta el estilo definido en `INTERFACES.md` §1 (tomado del login de ejemplo); no existe `PROMPT_PANTALLAS.md` y no se crea uno vacío.
+  - El diseño respeta el estilo institucional descrito en `INTERFACES.md` §1; no existe `PROMPT_PANTALLAS.md` y no se crea uno vacío.
 
-### Fase 2. Seguridad y acceso
+### Fase 2. Seguridad y acceso (login básico vigente; resto pendiente)
 
-### TK-006 Entidades de seguridad
-- **Descripción:** crear las entidades y repositorios de `rol`, `usuario`, `usuario_rol` y `usuario_carrera` (claves compuestas con `@EmbeddedId`).
+Los identificadores se conservan por trazabilidad. Está vigente solo el login básico de prototipo (`POST /usuarios/login`) y el filtro visual de menús y rutas. No hay sesión, cookies, autorización por rol ni control de acceso en la API (`SEGURIDAD.md`, `ARQUITECTURA.md` §11).
+
+### TK-006 Entidades de seguridad (no vigente)
+- **Estado:** tarea eliminada. Las entidades y repositorios de `rol`, `usuario`, `usuario_rol` y `usuario_carrera` se conservan como **datos de dominio** sobre el esquema existente, sin cambios de tablas ni columnas.
 - **Documentos:** `MODELO_DATOS.md` §4.1 a §4.6, `ARQUITECTURA.md` §7.
-- **Dependencias:** TK-002.
-- **Resultado esperado:** entidades que reflejan la tabla real.
-- **Criterios de aceptación:**
-  - Nombres y tipos coinciden con `MODELO_DATOS.md`.
-  - `hashPassword`, `intentosFallidos` y `bloqueadoHasta` llevan `@JsonIgnore`.
-  - No se asigna `id` desde el código.
+- **Vigente:** nombres y tipos acordes con `MODELO_DATOS.md`; `hashPassword`, `intentosFallidos` y `bloqueadoHasta` nunca se serializan; el `id` no se asigna desde el código.
 
-### TK-007 Autenticación y sesión
-- **Descripción:** implementar API-001, API-002 y API-003 con sesiones tradicionales del servidor Quarkus, sesiones sencillas en memoria, cookie HttpOnly, verificación BCrypt y control básico de intentos fallidos y bloqueo temporal. Antes de usar APIs internas de Quarkus, verificar su existencia y compatibilidad con la versión efectiva 3.40.1 sobre los JAR del proyecto.
-- **Documentos:** `ARQUITECTURA.md` §11 y §12, `SEGURIDAD.md` §2 y §7, `FLUJOS.md` FL-001, `CONTRATOS_REST.md` §2 y §6.
-- **Dependencias:** TK-006; CR-2 resuelto (sesiones tradicionales con cookie HttpOnly).
-- **Resultado esperado:** inicio y cierre de sesión funcionales; identidad y roles disponibles en cada petición.
-- **Criterios de aceptación:**
-  - Contraseña verificada con BCrypt (`BcryptUtil`); nunca se devuelve ni se registra.
-  - Cada fallo suma a `intentosFallidos`; superado el límite configurable, la cuenta se bloquea hasta `bloqueadoHasta`.
-  - Un acceso correcto reinicia los intentos y registra `ultimoLogin`.
-  - Cuenta inactiva, bloqueada o con credenciales erróneas devuelve el mismo 401 genérico.
-  - La sesión se almacena en memoria en una clase única; sin tabla de sesiones, sin JWT, sin cookies autocontenidas, sin renovación automática y sin sesiones distribuidas.
-  - La cookie contiene solo un identificador aleatorio, con `HttpOnly=true` y `Secure` en HTTPS; su duración, `Max-Age`, nombre y `SameSite` se leen de configuración, sin valores fijos en el código (`SEGURIDAD.md` §2.8).
-  - Si la cuenta se bloquea después del ingreso, la sesión activa sigue vigente; el bloqueo solo impide iniciar nuevas sesiones. No se implementa cierre masivo ni consulta a la base en cada petición para detectar bloqueos (`SEGURIDAD.md` §2.7).
-  - `logout` invalida la sesión; una petición sin sesión válida responde 401 con `SIN_SESION` y formato `{codigo, mensaje}`.
-  - `@Authenticated` y `@RolesAllowed` producen 401/403 con `SIN_SESION`/`SIN_PERMISO` y formato `{codigo, mensaje}`; se verifica si los mappers internos de Quarkus interceptan esas excepciones y, de ser así, se documenta la resolución antes de dar la tarea por terminada.
-  - Las APIs internas de Quarkus que se utilicen quedan confinadas en una sola clase adaptadora y se revalidan en cada actualización.
-  - El adaptador devuelve la identidad desde `authenticate(...)` como `Uni<SecurityIdentity>`; la implementación de `SecurityIdentity` es una clase interna y se instancia una vez por petición autenticada, sin campo compartido ni llamada manual a `CurrentIdentityAssociation.setIdentity(...)`. No se usa `QuarkusSecurityIdentity`.
-  - La identidad contiene solo `id`, correo y roles; en las pruebas se verifica que `CurrentIdentityAssociation.current()` devuelve la identidad de cada petición y que dos usuarios distintos no comparten instancia.
-  - La protección CSRF queda fuera del MVP como mejora futura de seguridad; no se implementa ni se valida en esta tarea.
+### TK-007 Autenticación y sesión (no vigente; eliminada)
+- **Estado:** eliminada y pendiente a futuro. API-001 a API-004 y las rutas `/auth` no están vigentes.
+- **No aplica:** sesiones, cookies, `SecurityIdentity`, `@Authenticated`, `@RolesAllowed`, intentos fallidos, bloqueos, caducidades ni generaciones de sesión.
+- **Se conserva:** BCrypt solo para generar hashes al crear o actualizar contraseñas (`ARQUITECTURA.md` §7).
 
-### TK-008 Cambio y restablecimiento de contraseña
-- **Descripción:** implementar API-004 y API-030, y la obligación de cambio con `debeCambiarPassword`.
-- **Documentos:** `SEGURIDAD.md` §2.5, `FLUJOS.md` FL-002.
-- **Dependencias:** TK-007.
-- **Resultado esperado:** el usuario cambia su contraseña; el administrador la restablece.
-- **Criterios de aceptación:**
-  - La nueva contraseña se guarda con BCrypt.
-  - Tras el cambio obligatorio, `debeCambiarPassword` queda en falso.
-  - Un usuario con cambio obligatorio no accede a otras operaciones hasta cambiarla.
-  - No existe recuperación por correo (fuera del MVP).
+### TK-008 Cambio y restablecimiento de contraseña (no vigente; eliminada)
+- **Estado:** eliminada y pendiente a futuro. API-004 y API-030 no están vigentes; no hay cambio obligatorio de contraseña ni recuperación.
+- **Se conserva:** el hash BCrypt al crear o actualizar contraseñas y las columnas existentes en la BD, sin uso para control de acceso.
 
-  **Nota de Fase 5:** API-004 sigue pendiente y no está implementada. `debeCambiarPassword` se registra en API-026 y API-030, pero no bloquea rutas ni operaciones; no se modificaron login, sesión ni cookie para este fin. UI-002 y su redirección obligatoria tampoco están implementadas.
+### TK-009 Autorización por rol y ámbito (no vigente; eliminada)
+- **Estado:** eliminada y pendiente a futuro. No hay `@RolesAllowed`, lista de verificación de permisos ni verificación de propiedad o ámbito por actor.
+- **Se conservan:** los roles y carreras como datos de dominio; las reglas académicas y de negocio de cada operación.
 
-### TK-009 Autorización por rol y ámbito
-- **Descripción:** habilitar `@RolesAllowed` con los códigos de rol y un componente reutilizable que verifique propiedad y ámbito (`alcance_global`, `usuario_carrera`, `empresa_usuario`).
-- **Documentos:** `SEGURIDAD.md` §3, §4, §5, `REGLAS_NEGOCIO.md` RN-003.
-- **Dependencias:** TK-007.
-- **Resultado esperado:** infraestructura de autorización usada por todos los módulos.
-- **Criterios de aceptación:**
-  - Sin sesión → 401; sin rol → 403; registro ajeno o fuera de ámbito → 404.
-  - Un usuario con varios roles recibe la unión de permisos.
-  - Los listados se filtran en la consulta, no después de traer todos los registros.
-  - La lista de verificación de `SEGURIDAD.md` §7.3 se cumple.
-
-### TK-010 Pantallas de acceso
-- **Descripción:** construir UI-001, UI-002 y UI-003.
-- **Documentos:** `INTERFACES.md` §3, `CONTRATOS_REST.md` API-001 a API-004.
-- **Dependencias:** TK-005, TK-007, TK-008.
-- **Resultado esperado:** flujo de login, cambio de contraseña e inicio.
-- **Criterios de aceptación:**
-  - Los estados de cada pantalla están implementados.
-  - El login no muestra accesos de demostración ni enlace de recuperación.
-  - Con cambio obligatorio, el menú no se muestra.
+### TK-010 Pantallas de acceso (no vigente; eliminada)
+- **Estado:** eliminada y pendiente a futuro. UI-001 y UI-002 no existen: no hay `/login`, `/cambiar-password` ni redirecciones a ellas. UI-003 se documenta sin acceso por rol (`INTERFACES.md` §3).
 
 ### Fase 3. Estructura académica
 
@@ -209,7 +164,7 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Criterios de aceptación:**
   - Un perfil de estudiante exige carrera activa.
   - Un perfil duplicado por usuario devuelve 409.
-  - El coordinador solo opera en su ámbito.
+  - La carrera y el ámbito institucional se conservan como datos de dominio; la restricción por rol o ámbito no está vigente como control de acceso.
 
 ### TK-017 Pantallas de usuarios
 - **Descripción:** UI-004 y UI-005.
@@ -218,14 +173,14 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Resultado esperado:** gestión de usuarios desde la interfaz.
 - **Criterios de aceptación:**
   - Filtros, estados y mensajes de validación implementados.
-  - Nunca se muestran contraseña, intentos ni bloqueo.
+  - Nunca se muestra contraseña ni hash; los campos de intentos y bloqueo no se usan.
 
 ### Fase 5. Empresas y convenios
 
 ### TK-018 Empresas y convenios
 - **Descripción:** backend API-039 a API-047.
 - **Documentos:** `MODELO_DATOS.md` §4.10, §4.14, `REGLAS_NEGOCIO.md` RN-008, RN-010, §4.3.
-- **Dependencias:** TK-009, TK-004.
+- **Dependencias:** TK-002. Las referencias anteriores a TK-009 y TK-004 no están vigentes (`SEGURIDAD.md`, `CONTEXTO_ACTOR.md`).
 - **Resultado esperado:** empresas y convenios administrables.
 - **Criterios de aceptación:**
   - RUC de 13 dígitos y único.
@@ -240,7 +195,7 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Criterios de aceptación:**
   - El primer miembro debe ser `ADMIN_EMPRESA`; la empresa no queda sin administrador activo.
   - Los miembros se desactivan, no se eliminan.
-  - Un representante solo opera en su empresa.
+  - `REPRESENTANTE_EMPRESA` y `ADMIN_EMPRESA` son datos de dominio; la restricción de operación por empresa no está vigente como control de acceso.
 
 ### TK-020 Pantallas de empresas
 - **Descripción:** UI-010 y UI-011.
@@ -248,8 +203,8 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Dependencias:** TK-018, TK-019, TK-005.
 - **Resultado esperado:** gestión de empresas desde la interfaz.
 - **Criterios de aceptación:**
-  - Las cuatro pestañas de UI-011 funcionan.
-  - El representante ve solo su empresa y no edita convenios.
+  - Las cuatro pestañas de UI-011 funcionan como detalle institucional en `/empresas/:id`.
+  - No hay vista «Mi empresa» ni operaciones condicionadas a un representante autenticado; API-086 no está vigente.
 
 ### Fase 6. Ofertas
 
@@ -263,7 +218,7 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
   - Rechazar y cancelar exigen motivo.
   - Editar una oferta `PUBLICADA` la devuelve a `PENDIENTE_REVISION`.
   - Los snapshots, fechas de publicación y resolución no se escriben desde el código; se relee el valor final tras `flush()`.
-  - Un `PUBLICADOR` solo gestiona sus ofertas; el `ADMIN_EMPRESA`, todas las de su empresa.
+  - `PUBLICADOR` y `ADMIN_EMPRESA` se conservan como datos de dominio; la limitación por rol o empresa no está vigente como control de acceso.
 
 ### TK-022 Perfiles de oferta
 - **Descripción:** backend API-059 a API-061, con carreras y requisitos laborales.
@@ -284,7 +239,7 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Criterios de aceptación:**
   - Se advierte que editar una oferta publicada la devuelve a revisión.
   - Se muestran las observaciones de una oferta rechazada.
-  - Las acciones visibles dependen del estado y del rol de empresa.
+  - Las acciones visibles dependen del estado de la oferta; el rol de empresa es dato de dominio, no permiso.
 
 ### TK-024 Pantallas de revisión de ofertas (coordinador)
 - **Descripción:** UI-012 y UI-014 con las acciones del coordinador.
@@ -314,10 +269,10 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Dependencias:** TK-016, TK-022, TK-004.
 - **Resultado esperado:** postular, editar mensaje y retirar.
 - **Criterios de aceptación:**
-  - Postula el estudiante autenticado; nunca se acepta un estudiante enviado por el cliente.
+  - La postulación se registra para un estudiante existente; no hay usuario autenticado ni actor de sesión. El criterio anterior de "estudiante autenticado" no está vigente.
   - Se rechazan oferta no publicada o vencida, convenio no vigente, carrera no incluida, perfil sin plazas y postulación duplicada.
   - Los requisitos académicos aplicables se validan en la API solo sobre los registros existentes (RD-021; CR-6 resuelto: validación en la API, módulo de definición futuro). No se insertan catálogos, requisitos ni datos institucionales ficticios; un listado vacío se gestiona sin generar validaciones inventadas.
-  - Un estudiante nunca ve postulaciones ajenas.
+  - La visualización restringida por propietario no está vigente como control de acceso; las reglas de elegibilidad y plazas sí se aplican.
 
 ### TK-027 Recomendación, resolución y formalización
 - **Descripción:** backend API-070, API-071 y API-075 a API-079; aceptar crea la práctica `APROBADA` en la misma transacción.
@@ -330,7 +285,7 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
   - Dos aceptaciones simultáneas de la última plaza: solo una se confirma; la otra responde 409 `CONFLICTO_CONCURRENCIA`.
   - Se rechaza la aceptación sin plaza, sin convenio vigente o con otra práctica vigente en el periodo.
   - Rechazar y cancelar exigen motivo; cancelar exige práctica cancelada o rechazada.
-  - Un representante solo recomienda sobre postulaciones de su empresa.
+  - La recomendación se rige por las reglas de negocio de la empresa como dato de dominio; la restricción por rol o ámbito no está vigente como control de acceso.
 
 ### TK-028 Pantallas de postulación del estudiante
 - **Descripción:** acción de postular en UI-016 y pantalla UI-017.
@@ -348,8 +303,8 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Dependencias:** TK-027, TK-005.
 - **Resultado esperado:** recomendar y resolver desde la interfaz.
 - **Criterios de aceptación:**
-  - El representante solo ve postulaciones de su empresa.
-  - Las acciones dependen del rol y estado de la postulación.
+  - La empresa se conserva como dato de dominio; la visibilidad restringida por representante no está vigente como control de acceso.
+  - Las acciones dependen del estado de la postulación; el rol no concede permisos.
   - Tras aceptar se ofrece el enlace a la práctica creada.
 
 ### Fase 8. Prácticas y asignación
@@ -363,7 +318,7 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
   - El tutor empresarial debe ser de la empresa de la práctica.
   - La asignación exige tutor de la empresa y fechas; la transición a `EN_CURSO` (API-083) no se implementa en el MVP (CR-8).
   - Cancelar cancela la postulación y libera la plaza.
-  - Cada rol ve solo prácticas propias, de su empresa o de su ámbito.
+  - La propiedad, la empresa y el ámbito son datos de dominio; la visibilidad por rol no está vigente como control de acceso.
   - Se usa `@Version` en `practica` para la concurrencia; un conflicto al asignar responde 409 `CONFLICTO_CONCURRENCIA`. La asignación de tutores y fechas está en el MVP; `iniciar` (API-083) no.
 
 ### TK-031 Pantallas de prácticas
@@ -372,7 +327,7 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Dependencias:** TK-030, TK-005.
 - **Resultado esperado:** consulta de prácticas y asignación desde la interfaz.
 - **Criterios de aceptación:**
-  - Solo el coordinador ve las acciones de asignar y cancelar; «iniciar» no aparece en el MVP (CR-8).
+  - Las acciones de asignar y cancelar se muestran sin restricción por rol; «iniciar» no aparece en el MVP (CR-8).
   - Los selectores de tutor muestran solo tutores de la empresa de la práctica.
 
 ### Fase 9. Auditoría, cierre y validación
@@ -385,28 +340,28 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 - **Criterios de aceptación:**
   - Ningún endpoint modifica ni elimina registros de auditoría.
   - Los filtros por usuario, entidad y fechas funcionan.
-  - El coordinador ve solo su ámbito.
+  - El filtrado por rol o ámbito no está vigente como control de acceso; los roles y carreras son datos de dominio.
 
 ### TK-033 Cierre automático de ofertas vencidas
 - **Descripción:** programar la ejecución periódica de `cerrar_ofertas_vencidas()`.
 - **Documentos:** `FLUJOS.md` FL-023, `MODELO_DATOS.md` §7.2, `REGLAS_NEGOCIO.md` RN-016.
-- **Dependencias:** TK-021, TK-004.
+- **Dependencias:** TK-021. La referencia anterior a TK-004 no está vigente (`CONTEXTO_ACTOR.md`).
 - **Resultado esperado:** ofertas vencidas pasan a `CERRADA` sin intervención.
 - **Criterios de aceptación:**
-  - Se ejecuta con `praxis.sistema = 'true'`.
-  - El historial identifica la operación como del sistema.
+  - El cierre automático se ejecuta sin fijar `praxis.sistema`: ese parámetro ya no se configura desde la aplicación; los triggers que lo requieran pueden rechazar la operación.
+  - No se inventa un usuario \"sistema\" ni un identificador fijo para evitar el rechazo.
   - Las postulaciones pendientes de ofertas cerradas siguen pudiendo resolverse.
 
-### TK-034 Verificación de reglas y seguridad
-- **Descripción:** pruebas de los escenarios de `FLUJOS.md` §6 y de la lista de `SEGURIDAD.md` §7.3.
-- **Documentos:** `FLUJOS.md`, `REGLAS_NEGOCIO.md`, `SEGURIDAD.md`.
+### TK-034 Verificación de reglas (parte de seguridad no vigente)
+- **Descripción:** pruebas de los escenarios de `FLUJOS.md` §6 y de las reglas académicas y de negocio vigentes. La parte de seguridad de la tarea queda eliminada y pendiente a futuro.
+- **Documentos:** `FLUJOS.md`, `REGLAS_NEGOCIO.md`, `SEGURIDAD.md`, `CONTEXTO_ACTOR.md`.
 - **Dependencias:** TK-021 a TK-030.
-- **Resultado esperado:** evidencia de cumplimiento de reglas y permisos.
+- **Resultado esperado:** evidencia de cumplimiento de reglas de negocio; sin verificación de permisos porque no existen.
 - **Criterios de aceptación:**
-  - Ninguna operación, salvo el login, responde sin sesión.
-  - Un estudiante no accede a postulaciones, ofertas no publicadas ni prácticas ajenas.
-  - Los DTO de entrada no aceptan estado ni identificadores del actor.
-  - Los DTO de salida no exponen credenciales.
+  - No se prueban login, sesión, cookies, roles ni permisos: no están vigentes.
+  - Las ofertas no publicadas no se exponen como oportunidades por regla de negocio, no por autorización.
+  - Las estructuras de entrada no aceptan estado, fechas de resolución, quién resolvió ni identificadores del actor.
+  - Las estructuras de salida no exponen credenciales ni campos de seguridad.
 
 ### TK-035 Revisión final de la documentación
 - **Descripción:** recorrer el checklist de la guía maestra y resolver contradicciones entre documentos.
@@ -423,18 +378,18 @@ Todas las tareas tienen Responsable: **Por asignar** y Estado: **Pendiente**.
 | Fase | Depende de |
 |---|---|
 | 1 | Configuración del entorno y acceso a la base. |
-| 2 | Fase 1; CR-2 resuelto (sesiones tradicionales con cookie HttpOnly). |
-| 3 | Fases 1 y 2. |
-| 4 | Fases 2 y 3. |
-| 5 | Fases 2 y 4. |
+| 2 | No vigente; pendiente a futuro. No es dependencia de las fases académicas. |
+| 3 | Fase 1. |
+| 4 | Fase 3. |
+| 5 | Fase 4. |
 | 6 | Fases 3 y 5. |
 | 7 | Fases 4 y 6. |
 | 8 | Fases 5 y 7. |
 | 9 | Fases anteriores. |
 
-Decisiones ya resueltas: CR-1 a CR-8 (prefijo de la API, sesiones tradicionales con cookie HttpOnly y BCrypt, seguridad básica, correcciones administrativas, permisos, validaciones académicas, paginación y límite del MVP). Ya no bloquean el inicio de las fases.
+Decisiones ya resueltas: CR-1 y CR-4 a CR-8 (prefijo de la API, correcciones administrativas sin control de acceso por rol, validaciones académicas, paginación y límite del MVP). CR-2 y CR-3 están vigentes solo como login básico y filtro visual de pantallas; sesión, cookies, permisos reales, intentos y bloqueos quedan pendientes a futuro.
 
-Pendientes que no bloquean el MVP: valores concretos de los parámetros de sesión (duración, `Max-Age`, nombre de cookie y `SameSite`) y de intentos y bloqueo (configurables, sin fijar en código), eventos de seguridad adicionales en la auditoría, diseño de fases posteriores a la asignación y decisiones de módulos futuros (reportes, módulo de requisitos, `EN_CURSO` y etapas siguientes).
+Pendientes que no bloquean el MVP: diseño de fases posteriores a la asignación y decisiones de módulos futuros (reportes, módulo de requisitos, `EN_CURSO` y etapas siguientes). No hay parámetros de sesión, cookie, intentos ni bloqueo: esas funciones fueron eliminadas.
 
 ## 5. Criterios de aceptación generales
 
@@ -443,11 +398,11 @@ Se aplican a toda tarea además de los propios:
 1. Respeta la arquitectura `Resource → Service → Repository → Entity` y el módulo de referencia.
 2. No modifica el esquema de la base, no crea migraciones ni scripts de alteración.
 3. Consulta `MODELO_DATOS.md` antes de crear o cambiar entidades.
-4. Declara el rol en el Resource y verifica propiedad y ámbito en el Service.
+4. No declara roles en el Resource ni verifica propiedad o ámbito por actor: no hay autorización por rol en la aplicación. Los roles y carreras se conservan como datos de dominio.
 5. No expone credenciales ni secretos.
 6. No implementa funcionalidades fuera del MVP.
-7. Usa sesiones tradicionales con cookie HttpOnly; no introduce JWT ni tokens de acceso.
-7. El comportamiento puede verificarse con pruebas automatizadas o con un procedimiento manual descrito.
+7. No introduce sesiones, cookies, JWT ni tokens de acceso.
+8. El comportamiento puede verificarse con pruebas automatizadas o con un procedimiento manual descrito.
 
 ## 6. Estado de avance
 
@@ -455,7 +410,7 @@ Se aplican a toda tarea además de los propios:
 |---|---|---|
 | TK-001 a TK-035 | Por asignar | Pendiente |
 
-Estados permitidos: Pendiente, En elaboración, En revisión, Aprobado. Al asignar responsables, desglosar esta tabla tarea por tarea.
+Estados permitidos: Pendiente, En elaboración, En revisión, Aprobado. Al asignar responsables, desglosar esta tabla tarea por tarea. Las tareas no vigentes (Fase 2, TK-004 y la parte de seguridad de TK-034) se conservan solo por trazabilidad.
 
 ### 6.1. Seguimiento individual de la Fase 5
 
@@ -465,7 +420,7 @@ Desglose autorizado de la fila global, que **se conserva sin cambios**. El usuar
 |---|---|---|---|
 | TK-018 Empresas y convenios | Por asignar | Aprobado | Pruebas unitarias de `EmpresaRepositoryTest`, `EmpresaServiceTest`, `ConvenioServiceTest` y `ConvenioResourceTest`; build frontend; detalle en §6.3 |
 | TK-019 Miembros y tutores empresariales | Por asignar | Aprobado | Pruebas unitarias de `EmpresaUsuarioServiceTest`, `EmpresaUsuarioRepositoryTest`, `EmpresaUsuarioResourceTest` y `TutorEmpresarialResourceTest`; build frontend; detalle en §6.3 |
-| TK-020 Pantallas de empresas | Por asignar | Aprobado | API-086, UI-010 y UI-011 implementadas; build frontend; sin prueba manual de navegador; detalle en §6.3 |
+| TK-020 Pantallas de empresas | Por asignar | Aprobado | UI-010 y UI-011 implementadas como detalle institucional; build frontend; sin prueba manual de navegador; detalle en §6.3. API-086 no está vigente |
 
 El consolidado, el inventario de cambios, las evidencias y las limitaciones están en §6.3. Esa sección distingue implementación, auditoría documental, pruebas ejecutadas y validaciones no ejecutadas.
 
@@ -483,13 +438,13 @@ TK-011 / UI-006 (Facultades) también está implementada en `/admin/facultades` 
 
 ### 6.3. Evidencias, decisiones y limitaciones consolidadas
 
-Esta sección conserva la información vigente de las entregas aprobadas para que los documentos de cierre no sean necesarios como fuente independiente. No registra aprobaciones nuevas ni modifica los estados de §6.1 y §6.2. Las decisiones permanentes siguen en su documento: arquitectura en `ARQUITECTURA.md`, permisos en `SEGURIDAD.md`, contratos en `CONTRATOS_REST.md`, reglas en `REGLAS_NEGOCIO.md`, modelo en `MODELO_DATOS.md` e interfaces en `INTERFACES.md`.
+Esta sección conserva la información vigente de las entregas aprobadas para que los documentos de cierre no sean necesarios como fuente independiente. No registra aprobaciones nuevas ni modifica los estados de §6.1 y §6.2. Las decisiones permanentes siguen en su documento: arquitectura en `ARQUITECTURA.md`, estado de seguridad en `SEGURIDAD.md`, contratos en `CONTRATOS_REST.md`, reglas en `REGLAS_NEGOCIO.md`, modelo en `MODELO_DATOS.md` e interfaces en `INTERFACES.md`. El material relativo a autenticación, sesión, permisos, actor o «Mi empresa» se conserva solo como evidencia histórica y no está vigente.
 
 #### 6.3.1. Fase 5 (TK-018, TK-019 y TK-020)
 
-**Decisiones y casos vigentes.** API-039 a API-047 (empresas y convenios), API-048 a API-053 (miembros y tutores) y API-086 (`GET /empresas/miEmpresa`) permanecen según sus contratos. Las correcciones aceptadas se reflejan en los documentos correspondientes: RUC de 13 dígitos con 400 para formato inválido y 409 para duplicado; `estadoEfectivo` con `VENCIDO` derivado de `v_convenio_estado` sin escribir columnas gestionadas por la base; `ConvenioResumen` expuesto por el Service sin DTO independiente; bloqueo pesimista de la fila de empresa; miembros con bajas lógicas sin dejar la empresa sin `ADMIN_EMPRESA`; contexto de actor solo en API-049 y API-050; API-053 con `id` del tutor en el cuerpo y `empresaId` en la ruta; API-086 con 0 membresías → 404 y más de una → 409, sin revelar identificadores; acceso REP a «Mi empresa» condicionado a API-086, con `PUBLICADOR` sin acceso. La matriz de permisos no se amplió ni se restringió.
+**Decisiones y casos vigentes.** API-039 a API-047 (empresas y convenios) y API-048 a API-053 (miembros y tutores) permanecen según sus contratos académicos y de dominio. Las correcciones aceptadas se reflejan en los documentos correspondientes: RUC de 13 dígitos con 400 para formato inválido y 409 para duplicado; `estadoEfectivo` con `VENCIDO` derivado de `v_convenio_estado` sin escribir columnas gestionadas por la base; `ConvenioResumen` expuesto por el Service sin DTO independiente; bloqueo pesimista de la fila de empresa; miembros con bajas lógicas sin dejar la empresa sin `ADMIN_EMPRESA`; y API-053 con `id` del tutor en el cuerpo y `empresaId` en la ruta. No están vigentes API-086 (`GET /empresas/miEmpresa`), el acceso REP a «Mi empresa», el contexto de actor en API-049 y API-050 ni la matriz de permisos; esos elementos quedan pendientes a futuro (`CONTRATOS_REST.md`, `CONTEXTO_ACTOR.md`, `SEGURIDAD.md`).
 
-**Correcciones aceptadas por bloque.** Bloque 1: AL-09 (membresía efectiva), AL-01 (sin contexto de actor en empresas/convenios), AL-02 y MED-10 (estado efectivo), MED-08 (bloqueo pesimista) y MED-01 (RUC inválido 400 / duplicado 409). Bloque 2: AL-04 (SQL nativo de solo lectura justificado), AL-07 (actor desde `SecurityIdentity` y `empresaId` validado), AL-10 (alcance de `ContextoActorService`), MED-02 (Resource sin dependencia del Repository), MED-03 (API-053 documentada) y MED-04 (permisos solo documentados, sin cambios). Bloque 3: MED-09 (contexto de navegación frente a roles múltiples), LOW-03 (visibilidad REP condicionada a API-086), LOW-04 (reinicio de pestaña al cambiar de empresa), LOW-05 (una sola llamada a API-086) y LOW-06 (sin mensaje prematuro de permiso). Bloque 4: CR-01 (seguimiento individual), CR-02 (cierres individuales), CR-03 (distinción entre registrar, editar, gestionar y consultar), AL-03 (rutas implementadas), AL-05 (README actualizados), AL-06 (API-004 pendiente), AL-08 (valores vigentes frente a decisiones aprobadas), MED-05 (referencia obsoleta), MED-06 y MED-07 (procedencia de la evidencia) y MED-08 (limitaciones de integración). Todos los hallazgos autorizados fueron tratados; no se rehicieron decisiones aceptadas ni se revirtieron bloques anteriores. No quedan hallazgos funcionales pendientes de esos bloques: solo las validaciones de integración y navegador, más API-004 y UI-002, que están fuera de la fase.
+**Correcciones aceptadas por bloque (evidencia histórica).** Bloque 1: AL-09 (membresía efectiva), AL-01 (sin contexto de actor en empresas/convenios), AL-02 y MED-10 (estado efectivo), MED-08 (bloqueo pesimista) y MED-01 (RUC inválido 400 / duplicado 409). Bloque 2: AL-04 (SQL nativo de solo lectura justificado), AL-07 (actor desde `SecurityIdentity` y `empresaId` validado), AL-10 (alcance de `ContextoActorService`), MED-02 (Resource sin dependencia del Repository), MED-03 (API-053 documentada) y MED-04 (permisos solo documentados, sin cambios). Bloque 3: MED-09 (contexto de navegación frente a roles múltiples), LOW-03 (visibilidad REP condicionada a API-086), LOW-04 (reinicio de pestaña al cambiar de empresa), LOW-05 (una sola llamada a API-086) y LOW-06 (sin mensaje prematuro de permiso). Bloque 4: CR-01 (seguimiento individual), CR-02 (cierres individuales), CR-03 (distinción entre registrar, editar, gestionar y consultar), AL-03 (rutas implementadas), AL-05 (README actualizados), AL-06 (API-004 pendiente), AL-08 (valores vigentes frente a decisiones aprobadas), MED-05 (referencia obsoleta), MED-06 y MED-07 (procedencia de la evidencia) y MED-08 (limitaciones de integración). Los hallazgos referidos a actor, `SecurityIdentity`, `ContextoActorService`, roles, permisos, API-086 y visibilidad REP corresponden a decisiones ya removidas y no están vigentes. Las validaciones de integración y navegador siguen pendientes; API-004 y UI-002 quedan pendientes a futuro.
 
 **Pruebas ejecutadas.** Validación final del 22 de noviembre de 2026, JDK 25.0.2, Maven offline, sin `clean`, sin integración y sin base de datos:
 
@@ -501,7 +456,7 @@ Esta sección conserva la información vigente de las entregas aprobadas para qu
 | `EmpresaUsuarioServiceTest` | 12 | 0 | 0 |
 | `TutorEmpresarialResourceTest` | 5 | 0 | 0 |
 | `EmpresaUsuarioResourceTest` | 5 | 0 | 0 |
-| `EmpresaResourceMiEmpresaTest` | 3 | 0 | 0 |
+| `EmpresaResourceMiEmpresaTest` (histórico, no vigente) | 3 | 0 | 0 |
 | `EmpresaServiceTest` | 27 | 0 | 0 |
 | `EmpresaRepositoryTest` | 2 | 0 | 0 |
 | **Total** | **85** | **0** | **0** |
@@ -510,19 +465,21 @@ Build frontend de esa validación: `npm run build`, 56 módulos transformados, b
 
 **Evidencia histórica.** La ejecución anterior de TK-020 registró `EmpresaServiceTest` 24 pruebas, `EmpresaUsuarioRepositoryTest` 7 y `EmpresaResourceMiEmpresaTest` 3, con bundle `index-BLbwiBZb.js` de 273,05 kB; se conserva como reporte histórico, no como ejecución de las correcciones de Fase 5. `target/surefire-reports` refleja solo la ejecución más reciente. En Fase 1.1 se estableció una conexión JDBC de solo lectura; no se repitió en Fase 5.
 
-**Limitaciones.** No se ejecutaron `@QuarkusTest`, la suite Maven completa, integración con PostgreSQL o Supabase, triggers de `empresa_usuario`, consulta real de `v_convenio_estado`, concurrencia real de API-050 ni pruebas manuales de navegador. API-004 y UI-002 siguen pendientes. La revisión frontend fue build y análisis estático. La matriz completa de permisos sigue en `SEGURIDAD.md` §4.2 y la de operaciones por rol y pestaña en `INTERFACES.md` UI-011.
+**Limitaciones.** No se ejecutaron `@QuarkusTest`, la suite Maven completa, integración con PostgreSQL o Supabase, triggers de `empresa_usuario`, consulta real de `v_convenio_estado`, concurrencia real de API-050 ni pruebas manuales de navegador. API-004 y UI-002 están pendientes a futuro. La revisión frontend fue build y análisis estático. En esa fase no había matriz de permisos vigente: `SEGURIDAD.md` documentaba la eliminación de autenticación y autorización, y `INTERFACES.md` UI-011 describía solo operaciones institucionales.
 
-**Inventario de cambios.** Backend: `EmpresaRepository.java` (bloqueo pesimista y ámbito), `EmpresaService.java` (RUC, ámbito y API-086, sin contexto de actor), `EmpresaUsuarioService.java` (membresía efectiva y reglas), `EmpresaUsuarioRepository.java` (consultas de membresía y justificación de SQL nativo), `EmpresaResource.java` (API-086 y actor), `EmpresaUsuarioResource.java` (API-048 a API-050), `TutorEmpresarialResource.java` (API-051 a API-053), `ConvenioService.java` (`ConvenioResumen`) y `ConvenioResource.java` (publicación de esa estructura). Frontend: `AppRoutes.jsx`, `Navegacion.jsx`, `LayoutPrincipal.jsx`, `MiEmpresa.jsx`, `DetalleEmpresa.jsx` y `empresaService.js`. Pruebas: `EmpresaRepositoryTest`, `EmpresaServiceTest`, `EmpresaUsuarioServiceTest`, `EmpresaResourceMiEmpresaTest`, `ConvenioServiceTest`, `EmpresaUsuarioRepositoryTest`, `EmpresaUsuarioResourceTest`, `TutorEmpresarialResourceTest` y `ConvenioResourceTest` (nuevo). No se modificaron entidades, esquema, migraciones, triggers ni vistas. La documentación técnica vigente está en los documentos indicados al inicio de esta sección.
+**Nota posterior al login básico.** La limitación anterior corresponde a TK-020. El prototipo actual sí incorpora `POST /usuarios/login` y una matriz visual de módulos por rol en `src/main/webui/src/permisos.js`, verificada en navegador; no reintroduce sesión, cookies ni autorización en la API. La matriz está documentada en `INTERFACES.md` §2 y la limitación de seguridad en `SEGURIDAD.md`.
 
-**Incidencias de ejecución de TK-020.** El mensaje inicial llegó truncado y se reanudó con las instrucciones completas; PowerShell requirió comillas en `-Dtest=...`; `mvnw.cmd` necesitó `JAVA_HOME` fijado solo en el ámbito del comando; el constructor de `Administracion` se hizo público para las pruebas del Service; y la revisión final simplificó `MiEmpresa` en el Service para dejar `MiEmpresaResponse` como única estructura de salida, reejecutando pruebas y build. Ninguna incidencia cambió decisiones aprobadas.
+**Inventario de cambios (histórico).** Backend: `EmpresaRepository.java` (bloqueo pesimista), `EmpresaService.java` (RUC, convenios y reglas de empresa), `EmpresaUsuarioService.java` (membresía efectiva y reglas), `EmpresaUsuarioRepository.java` (consultas de membresía y justificación de SQL nativo), `EmpresaResource.java`, `EmpresaUsuarioResource.java` (API-048 a API-050), `TutorEmpresarialResource.java` (API-051 a API-053), `ConvenioService.java` (`ConvenioResumen`) y `ConvenioResource.java` (publicación de esa estructura). Frontend: `AppRoutes.jsx`, `Navegacion.jsx`, `LayoutPrincipal.jsx`, `DetalleEmpresa.jsx` y `empresaService.js`; `MiEmpresa.jsx` y las referencias a API-086 son evidencia histórica no vigente. Pruebas: `EmpresaRepositoryTest`, `EmpresaServiceTest`, `EmpresaUsuarioServiceTest`, `EmpresaResourceMiEmpresaTest` (no vigente), `ConvenioServiceTest`, `EmpresaUsuarioRepositoryTest`, `EmpresaUsuarioResourceTest`, `TutorEmpresarialResourceTest` y `ConvenioResourceTest`. No se modificaron entidades, esquema, migraciones, triggers ni vistas. La documentación técnica vigente está en los documentos indicados al inicio de esta sección.
 
-#### 6.3.2. Auditoría H-01 / H-02
+**Incidencias de ejecución de TK-020 (histórico).** El mensaje inicial llegó truncado y se reanudó con las instrucciones completas; PowerShell requirió comillas en `-Dtest=...`; `mvnw.cmd` necesitó `JAVA_HOME` fijado solo en el ámbito del comando; el constructor de `Administracion` se hizo público para las pruebas del Service. La simplificación de `MiEmpresa` y `MiEmpresaResponse` corresponde a API-086, hoy no vigente. Ninguna incidencia cambió decisiones académicas aprobadas. Nota: la referencia a `JAVA_HOME` quedó obsoleta porque el wrapper ahora usa `java.exe` desde PATH y no requiere esa variable.
 
-**H-01.** La invalidación de sesiones usa una generación por usuario: el login obtiene la generación antes de consultar roles; la creación y la invalidación comparten cerrojo; la búsqueda descarta sesiones obsoletas; el evento se publica con `@Observes(during = TransactionPhase.AFTER_SUCCESS)`. La decisión de no depurar el mapa de generaciones está en `SEGURIDAD.md` §2.6 y `ARQUITECTURA.md` §11. Pruebas ejecutadas: `SesionStoreTest` 21, `AutenticacionServiceTest` 12, `SesionInvalidacionObserverTest` 3, `UsuarioServiceTest` 24 e `IdentidadSesionTest` 5 (65 enfocadas, 0 fallos); suite unitaria amplia de 216 pruebas, 0 fallos, sin las tres clases `@QuarkusTest`; `test-compile` offline finalizó con `BUILD SUCCESS`. Las pruebas concurrentes usaron `CountDownLatch`, no esperas basadas solo en `sleep`.
+#### 6.3.2. Auditoría H-01 / H-02 (histórico; no vigente)
 
-**H-02.** `ContextoActorService` fija únicamente `praxis.usuario_id` en las escrituras de `empresa_usuario` (API-049 y API-050) mediante `set_config(..., true)`. No fija `praxis.motivo`, `praxis.sistema` ni `praxis.correccion_decision`; no implementa auditoría genérica. Las ampliaciones de API-079 y API-085 quedan sujetas a sus tareas. El alcance está en `CONTEXTO_ACTOR.md`.
+**H-01 (no vigente).** La invalidación de sesiones, el `SesionStore`, `AutenticacionService`, `SesionInvalidacionObserver` y `IdentidadSesionTest` pertenecen al diseño de autenticación eliminado. Las pruebas citadas en su momento (`SesionStoreTest` 21, `AutenticacionServiceTest` 12, `SesionInvalidacionObserverTest` 3, `UsuarioServiceTest` 24 e `IdentidadSesionTest` 5) se conservan solo como registro histórico. No hay sesiones que invalidar ni decisiones de duración, `Max-Age`, nombre de cookie o `SameSite` vigentes.
 
-**Dictámenes y limitaciones.** H-01: **CORREGIDO CON LIMITACIONES DOCUMENTADAS**; H-02: **CORREGIDO DOCUMENTALMENTE**. Queda sin verificar la entrega transaccional real de `AFTER_SUCCESS` con PostgreSQL, el comportamiento ante rollback en un entorno real, las pruebas `@QuarkusTest`, el despliegue multiinstancia y la omisión de sesiones obsoletas tras la autenticación de una petición en vuelo. Una carrera concurrente puede rechazar el inicio de sesión de forma genérica sin crear una sesión obsoleta.
+**H-02 (no vigente).** `ContextoActorService` y el fijado de `praxis.usuario_id` en API-049 y API-050 fueron eliminados. No se fijan `praxis.motivo`, `praxis.sistema` ni `praxis.correccion_decision` desde la aplicación. Los triggers que dependen de esos parámetros pueden rechazar escrituras; el riesgo y el pendiente están en `CONTEXTO_ACTOR.md`.
+
+**Estado actual.** Los dictámenes históricos (H-01 corregido con limitaciones documentadas; H-02 corregido documentalmente) ya no describen funcionalidad vigente. No hay sesiones, cookies, bloqueos, despliegue multiinstancia con sesiones ni validación de identidad. Queda pendiente, sin cambios de esquema, resolver el contexto que exigen los triggers si se decide restablecerlo.
 
 #### 6.3.3. Estructura académica (TK-011 a TK-014)
 
@@ -531,7 +488,7 @@ Build frontend de esa validación: `npm run build`, 56 módulos transformados, b
 - TK-013 / UI-008: builds correctos tras la implementación (`index-D2xe6L0l.js`, 291,10 kB) y tras las correcciones (`index-Fd_zyRjh.js`, 291,17 kB); `PeriodoAcademicoServiceTest` 7/7; M-1, M-2 y B-1 corregidos; auditoría final sin hallazgos. Sin verificación real de concurrencia entre activaciones. API-015 sin consumo directo; la creación deja el periodo inactivo, la edición no modifica el estado y toda mutación recarga el listado porque API-016 a API-019 devuelven 200/201 sin cuerpo.
 - TK-014 / UI-009: builds correctos tras la implementación (`index-BginAHsz.js`, 296,78 kB) y tras B-1 (`index-B8sSOJWa.js`, 296,98 kB); auditoría con dictamen **APROBADA CON OBSERVACIONES**, sin hallazgos críticos, altos ni medios; B-1 corregido con la expresión `/^[+-]?(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/` aplicada a la cadena original antes de cualquier conversión. Comprobación ejecutada con Node.js: `1`, `1.2`, `1.23`, `+1.23` y `.5` aceptados; `1.234` y `0.001` rechazados por decimales; `0` y `-1` rechazados por rango. API-021 sin consumo directo. B-2 pendiente (prioridad baja). `TipoPractica` no tiene `@Version`: las actualizaciones concurrentes pueden resolverse por último-write-wins.
 
-**Verificación.** Los builds y las pruebas unitarias citados se ejecutaron realmente. Las comprobaciones de contratos, permisos, rutas, errores y estados se verificaron por inspección y auditoría estática, no contra una instancia real. No se realizaron pruebas manuales de navegador ni pruebas contra PostgreSQL en estas entregas.
+**Verificación.** Los builds y las pruebas unitarias citados se ejecutaron realmente. Las comprobaciones de contratos, reglas de negocio, rutas, errores y estados se verificaron por inspección y auditoría estática, no contra una instancia real. No se verificaron permisos porque no existen. No se realizaron pruebas manuales de navegador ni pruebas contra PostgreSQL en estas entregas.
 
 #### 6.3.4. Verificación posterior de conexión con Supabase
 

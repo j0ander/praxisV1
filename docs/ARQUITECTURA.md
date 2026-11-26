@@ -22,8 +22,7 @@ La base de datos PostgreSQL ya existe y se utilizará como referencia para crear
 | CDI (ArC) | Inyección de dependencias. |
 | Hibernate ORM Panache | Acceso y persistencia de datos. |
 | PostgreSQL 15+ | Base de datos relacional. |
-| BCrypt | Hash de contraseñas. |
-| Sesiones HTTP del servidor | Autenticación con cookie de sesión HttpOnly; sin JWT ni tokens. |
+| BCrypt | Hash de contraseñas al crear o actualizar usuarios. |
 | Maven | Construcción y ejecución del backend. |
 | React + Vite | Interfaz web. |
 
@@ -35,7 +34,7 @@ D3: Inyección de dependencias mediante CDI.
 D4: El backend expondrá endpoints REST que recibirán y devolverán JSON.
 D5: Organización de paquetes por capa.
 D6: Transacciones declaradas con `@Transactional` solo en los métodos de escritura del Service. 
-D7: Autenticación mediante sesiones tradicionales del servidor Quarkus con cookie de sesión HttpOnly; las contraseñas se verifican con BCrypt. No se usa JWT, Bearer tokens, refresh tokens ni autenticación basada en tokens.
+D7: Sin autenticación ni sesión en la aplicación: no hay login, logout, cookies, JWT ni tokens. BCrypt se conserva solo para generar el hash al crear o actualizar contraseñas. Estado pendiente a futuro (`SEGURIDAD.md`).
 
 ## 3. Estructura del proyecto
 
@@ -99,11 +98,9 @@ PostgreSQL
 | Repository | Extiende `PanacheRepositoryBase<Entidad, TipoId>` para heredar el CRUD y usa `EntityManager` con JPQL para las consultas específicas. |
 | Entity | Representa una tabla de PostgreSQL mediante anotaciones JPA y contiene sus atributos, getters y setters. |
 
-Identidad del actor y ámbito. El usuario autenticado siempre se obtiene de `SecurityIdentity` (`praxis.usuarioId`) en el Resource; el cliente no puede fijarlo con un `usuarioId` en ruta, consulta o cuerpo. El `empresaId` puede aparecer en la ruta o en el cuerpo cuando el contrato aprobado lo prevé (por ejemplo, API-043 a API-053 y el `empresaId` titular de un convenio), pero nunca se considera de confianza: el Service valida existencia, pertenencia y ámbito antes de operar. API-086 no acepta `empresaId` ni `usuarioId` del cliente y deriva el ámbito exclusivamente del actor autenticado.
+Actor y ámbito. No hay usuario autenticado en la API: no se usan `SecurityIdentity` ni `praxis.usuarioId`, y el cliente no envía un identificador que pretenda representar al actor. El `empresaId` puede aparecer en la ruta o en el cuerpo cuando el contrato lo prevé (por ejemplo, API-043 a API-053 y el `empresaId` titular de un convenio) como dato de dominio; el Service valida su existencia y las reglas de negocio, no un ámbito de autorización. API-086 y `MiEmpresaResponse` no están vigentes (`CONTRATOS_REST.md` §3.3).
 
 Caso API-043 (convenios). `ConvenioResource.listarPorEmpresa()` no importa proyecciones del Repository: `ConvenioService` devuelve `ConvenioResumen` y el Resource publica esa misma estructura. La forma JSON no cambia; el Repository sigue siendo la única capa que consulta la vista `v_convenio_estado`.
-
-Caso API-086 (Mi empresa). `EmpresaResource.miEmpresa()` es la única entrada HTTP: no recibe parámetros del cliente y toma `praxis.usuarioId` de `SecurityIdentity`. `EmpresaService.miEmpresa()` valida usuario activo y rol global REP, y coordina tres repositorios: `EmpresaUsuarioRepository` (proyección de solo lectura con la membresía `ADMIN_EMPRESA` efectiva, sin filtrar `empresa.activa`), `UsuarioRepository` y `UsuarioRolRepository`. Cero membresías dan 404 y más de una dan 409, sin selección arbitraria ni datos de otras empresas. El Repository devuelve una proyección interna con `empresaId` y `rolEmpresa`; el Service carga y devuelve la `Empresa`, y el Resource construye `MiEmpresaResponse` como única estructura de salida, fijando `rolEmpresa` en `ADMIN_EMPRESA` porque es la única membresía que autoriza la operación. No se agregaron entidad, DTO independiente, capa ni servicio genérico.
 
 ## 6. Inyeccion de dependencias
 
@@ -217,8 +214,8 @@ Transacciones.
 Comportamiento de la base que el código debe respetar:
 
 - Los triggers pueden cambiar valores al guardar (estados, fechas, snapshots, `motivo_decision`). Si el Service necesita el valor final, lo relee después de `flush()`.
-- Contraseñas se guardan con BCrypt: BcryptUtil.bcryptHash(clave) para crear el hash y BcryptUtil.matches(clave, hash) para compararlo (clase io.quarkus.elytron.security.common.BcryptUtil).
-- El campo del hash en la entidad lleva @JsonIgnore.
+- Contraseñas se guardan con BCrypt: `BcryptUtil.bcryptHash(clave)` para crear el hash al alta o actualización (clase `io.quarkus.elytron.security.common.BcryptUtil`). El login básico compara con `BcryptUtil.matches(clave, hash)`; no guarda la clave en texto plano ni devuelve el hash.
+- El campo del hash en la entidad nunca se serializa (@JsonIgnore), al igual que `intentosFallidos` y `bloqueadoHasta`.
 
 ## 8. Convenciones de codigo
 
@@ -237,7 +234,7 @@ Comportamiento de la base que el código debe respetar:
 | Inyección | CDI mediante `@Inject`. |
 | Transacciones | `@Transactional` en operaciones de escritura. |
 | Consultas | CRUD heredado de `PanacheRepositoryBase<Entidad, TipoId>`; consultas propias con `EntityManager` y JPQL tipado según §7.1. |
-| Contraseñas | Se utiliza BCrypt para generar y comprobar hashes. |
+| Contraseñas | Se utiliza BCrypt para generar hashes al crear o actualizar contraseñas; sin verificación de credenciales. |
 
 ## 9. Configuracion local
 
@@ -584,48 +581,25 @@ El Resource construye las respuestas con la clase interna `FacultadResponse`: no
 
 El endpoint `DELETE` se conserva en el contrato REST (API-009) como patrón de referencia. La interfaz no ofrece eliminar facultades: solo desactivarlas (API-008). La eliminación debe respetar la integridad referencial de la base; si existen carreras u otros registros relacionados, la operación responde 409. No se asume que una facultad con registros asociados pueda borrarse físicamente.
 
-## 11. Autenticación y sesión
+## 11. Login básico y sesión
 
-Decisión técnica oficial (CR-2): PRAXIS usa **sesiones tradicionales del servidor Quarkus** con **cookie de sesión HttpOnly**. La contraseña almacenada se verifica con **BCrypt**. No se usan JWT, Bearer tokens, refresh tokens ni autenticación basada en tokens. No se crea ninguna tabla nueva para gestionar sesiones.
+**Estado actual:** existe un login básico de prototipo en `POST /usuarios/login`. Verifica la cuenta activa y el hash BCrypt con `BcryptUtil.matches` y responde 200 con `id`, `nombres`, `apellidos`, `correo` y `roles`; las credenciales inválidas responden 401 genérico. No hay sesión del servidor, cookies, tokens ni identidad del usuario por petición. No se usan `SecurityIdentity`, `@Authenticated` ni `@RolesAllowed`. No hay administrador inicial, intentos fallidos, bloqueos de cuenta ni caducidades.
 
-Flujo:
+React conserva la respuesta del login solo en `useState` en `App.jsx`; al recargar se pide el login de nuevo. La matriz de `src/main/webui/src/permisos.js` filtra menú y rutas por rol únicamente de forma visual: **no es autorización** y la API sigue sin restringir llamadas (`SEGURIDAD.md`, `INTERFACES.md` §2).
 
-1. El usuario envía su correo y contraseña a `POST /auth/login`.
-2. Quarkus verifica que la cuenta esté activa y que las credenciales sean válidas; la contraseña se compara con el hash BCrypt.
-3. Si son correctas, el servidor crea la sesión y devuelve la cookie de sesión.
-4. El navegador conserva la cookie y la envía en las siguientes peticiones.
-5. Quarkus comprueba la sesión y los permisos del usuario en cada petición.
-6. `POST /auth/logout` invalida la sesión en el servidor.
+Las rutas `/auth`, API-001 a API-004, API-086, la opción «Mi empresa» y UI-002 siguen no vigentes y quedan pendientes a futuro. UI-001 está vigente solo como login básico (`CONTRATOS_REST.md`, `INTERFACES.md`, `SEGURIDAD.md`).
 
-Mecanismo de autenticación e identidad por petición (decisión técnica aprobada):
+Las columnas de seguridad existentes en la base no se modifican: el login solo lee `hash_password` y `activo`; `intentos_fallidos`, `bloqueado_hasta` y `ultimo_login` no se usan. Los triggers que requieren `praxis.usuario_id` pueden rechazar escrituras porque la aplicación no fija ese contexto (`CONTEXTO_ACTOR.md`).
 
-- `HttpAuthenticationMechanism` se implementa en **una única clase adaptadora**; las importaciones internas `io.quarkus.vertx.http.runtime.security.*` quedan confinadas a esa clase. No se agrega ninguna dependencia.
-- El adaptador devuelve desde `authenticate(RoutingContext, IdentityProviderManager)` un `Uni<SecurityIdentity>` construido con la **interfaz pública** `io.quarkus.security.identity.SecurityIdentity`. No se usa `QuarkusSecurityIdentity` porque no está en el classpath efectivo del proyecto.
-- La implementación de `SecurityIdentity` es una **clase interna del adaptador**. Por cada petición autenticada se crea una **instancia nueva**, con solo el identificador del usuario, su correo y sus roles (`getPrincipal`, `isAnonymous` en `false`, `getRoles`, `hasRole`). No se guarda en un campo de la clase adaptadora ni se reutiliza entre usuarios.
-- Quarkus asocia la identidad devuelta al `RoutingContext` y la pone a disposición del resto de la petición; por eso **no se llama `CurrentIdentityAssociation.setIdentity(...)` desde el adaptador**. Durante la implementación se verifica que `CurrentIdentityAssociation.current()` devuelve la identidad de la petición.
-- Estas firmas se validaron contra los JAR efectivos de Quarkus 3.40.1 y se revalidan en cada actualización de la versión.
-
-Medidas básicas de la cookie:
-
-- La cookie de sesión es `HttpOnly` (no accesible desde JavaScript), con `Secure` en despliegues HTTPS y `SameSite` apropiado para el frontend React; no contiene datos del usuario ni credenciales.
-- La protección CSRF no forma parte del MVP; se considera una mejora futura de seguridad. No se instalará `quarkus-rest-csrf` ni se implementará `CSRFHandler` u otro mecanismo propio durante el MVP. El origen del frontend se restringe con CORS y se rechazan orígenes desconocidos.
-- La sesión se invalida al cerrar sesión; una sesión ausente, vencida o inválida responde 401.
-- La asignación o modificación de roles (`asignarRoles`), la desactivación (`desactivar`) y el restablecimiento de contraseña (`restablecerPassword`) invalidan todas las sesiones del usuario afectado. El Service publica un evento simple de capa de aplicación dentro de su transacción; un observador `@Observes(during = TransactionPhase.AFTER_SUCCESS)` invoca `SesionStore.invalidarPorUsuario` después del commit. Ante error o rollback no se ejecuta la invalidación. No se consulta PostgreSQL en cada petición ni se introducen tokens ni almacenamiento externo.
-- `SesionStore` mantiene una generación por usuario en un `ConcurrentHashMap` en memoria. `AutenticacionService.login` obtiene `generacionActual(usuarioId)` antes de consultar los roles y la pasa a `crear`; si la generación ya cambió por una invalidación confirmada, `crear` devuelve `null` y el login responde con un fallo genérico. La comprobación de la generación y la inserción de la sesión se ejecutan bajo el mismo cerrojo que `invalidarPorUsuario` (que incrementa la generación y elimina las sesiones), sin mantener bloqueos durante consultas a PostgreSQL. `buscar` vuelve a verificar la generación y descarta sesiones obsoletas. El mapa de generaciones no se limpia: su tamaño está acotado por el número de usuarios del sistema; rastrear logins en vuelo para limpiarlo añadiría complejidad desproporcionada al MVP. Los resultados de pruebas, las limitaciones pendientes y el dictamen de la auditoría H-01 están consolidados en `TAREAS.md` §6.3.2; el dictamen es **CORREGIDO CON LIMITACIONES DOCUMENTADAS**.
-- El identificador de sesión se guarda en un almacén sencillo en memoria del servidor, gestionado por una sola clase; la cookie solo transporta ese identificador aleatorio.
-- La expiración de la sesión es fija y configurable; no hay renovación automática en el MVP.
-- Si una cuenta se bloquea después de haber iniciado sesión, su sesión activa conserva su vigencia hasta expirar o hasta el cierre de sesión; el bloqueo impide iniciar nuevas sesiones. No se consulta PostgreSQL en cada petición para detectar bloqueos. Esta limitación comprende solo el bloqueo por intentos fallidos y es independiente de la invalidación por cambio de roles, desactivación o restablecimiento de contraseña descrita arriba.
-- Por tratarse de un almacén en memoria, las sesiones se pierden al reiniciar el servidor y el diseño corresponde a una sola instancia; no hay sesiones distribuidas.
-- Duración de la sesión, duración de la cookie (`Max-Age`), nombre de la cookie y `SameSite` son parámetros configurables sin valor aprobado; no se fijan en el código (`SEGURIDAD.md` §2.8).
-- Cualquier extensión o dependencia adicional necesaria se incorpora solo con aprobación (§12.8); el diseño de la autenticación no depende de tokens.
+Cualquier incorporación futura de sesión, cookies o autorización real requiere una decisión aprobada, una tarea autorizada y nuevas dependencias solo con aprobación (§12.8).
 
 ## 12. Restricciones tecnicas
 
 1. Simplicidad: no se agregan capas, interfaces, patrones o abstracciones que no sean necesarios.
 2. Sin DTO independientes: las entidades JPA se utilizan internamente; los Resources construyen respuestas REST explícitas como clases internas y no devuelven entidades JPA directamente al cliente. No se añaden capas de transformación ni DTOs independientes innecesarios, en coherencia con §8.
-3. Respeto a los triggers. No se escriben directamente las columnas gestionadas por triggers (snapshots, fechas de publicación y resolución de ofertas). Se debe prever que los valores guardados difieran de los enviados, que algunos errores aparezcan al confirmar la transacción y que ciertas operaciones requieran el contexto de sesión praxis.
+3. Respeto a los triggers. No se escriben directamente las columnas gestionadas por triggers (snapshots, fechas de publicación y resolución de ofertas). Se debe prever que los valores guardados difieran de los enviados y que algunos errores aparezcan al confirmar la transacción. Los triggers que leen `praxis.usuario_id` pueden rechazar escrituras: la aplicación ya no fija ese contexto (`CONTEXTO_ACTOR.md`).
 4. Parámetros pendientes de aprobación. No se fijan valores rígidos para horas requeridas, nota mínima, ponderaciones, plazos de vigencia ni requisitos académicos: se gestionan como datos o configuración. Los límites ya fijados en la base (8 horas diarias, 2 MB por informe) se respetan tal cual.
-5. Zona horaria. La zona de negocio es `America/Guayaquil`. Las fechas con hora que se muestran al usuario se convierten a esa zona; las columnas `TIMESTAMPTZ` se leen como `OffsetDateTime`.
+5. Fechas. No se configura zona horaria de negocio en el código: las fechas automáticas compatibles se calculan con `LocalDate.now()`. Las columnas `TIMESTAMPTZ` gestionadas por la base, incluidas `created_at` y `updated_at`, se conservan y se leen como `OffsetDateTime`, sin convertirlas a `LocalDate`.
 6. Alcance del MVP. No se implementan módulos excluidos (actividades y horas, informes, evaluaciones, certificados, reportes avanzados). Tampoco se implementa la transición de la práctica a `EN_CURSO` (API-083), la paginación de listados ni la definición automatizada de requisitos académicos como módulo; las validaciones académicas de la postulación sí se aplican en la API. Estas capacidades quedan identificadas como mejoras futuras.
 7. Secretos. Credenciales, cadenas con contraseña y llaves privadas no se versionan; se leen del entorno.
 8. Dependencias. Agregar una dependencia o extensión nueva al `pom.xml` requiere aprobación del equipo.

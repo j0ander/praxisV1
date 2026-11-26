@@ -3,12 +3,10 @@ import React, { useState } from 'react';
 import Boton from '../../components/comunes/Boton';
 import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
-import { useSesion } from '../../contextos/SesionContexto';
 import { mensajeDeError } from '../../services/api';
-import { navegar } from '../../routes/navegacion';
+import { iniciarSesion } from '../../services/authService';
 
-export default function Login() {
-  const { iniciar } = useSesion();
+export default function Login({ onIniciarSesion }) {
   const [correo, setCorreo] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -19,11 +17,11 @@ export default function Login() {
     setError(null);
     setEnviando(true);
     try {
-      await iniciar(correo, password);
-      navegar('/inicio', { reemplazar: true });
+      const datos = await iniciarSesion(correo.trim(), password);
+      onIniciarSesion(datos);
     } catch (fallo) {
       setError(fallo?.estado === 401
-        ? 'Credenciales incorrectas o cuenta no disponible.'
+        ? 'Correo o contraseña incorrectos.'
         : mensajeDeError(fallo));
     } finally {
       setEnviando(false);
@@ -38,12 +36,12 @@ export default function Login() {
           <p className="tarjeta-login__nombre">PRAXIS</p>
         </div>
         <h1>Iniciar sesión</h1>
-        <p>Ingrese sus credenciales institucionales.</p>
+        <p>Ingrese con su correo y contraseña institucionales.</p>
         <MensajeEstado tipo="error" mensaje={error} />
         <form onSubmit={manejarEnvio}>
           <CampoFormulario
             id="correo"
-            etiqueta="Correo institucional"
+            etiqueta="Correo electrónico"
             type="email"
             autoComplete="username"
             obligatorio
@@ -59,8 +57,8 @@ export default function Login() {
             value={password}
             onChange={(evento) => setPassword(evento.target.value)}
           />
-          <Boton type="submit" cargando={enviando} disabled={!correo || !password}>
-            Ingresar al sistema
+          <Boton type="submit" cargando={enviando} disabled={!correo.trim() || !password}>
+            Iniciar sesión
           </Boton>
         </form>
       </div>

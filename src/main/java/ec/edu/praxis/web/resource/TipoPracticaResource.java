@@ -6,8 +6,6 @@ import java.util.List;
 
 import ec.edu.praxis.application.service.TipoPracticaService;
 import ec.edu.praxis.domain.model.TipoPractica;
-import io.quarkus.security.Authenticated;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -19,8 +17,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-/** API-020 a API-023: consulta y administración de tipos de práctica. */
-@Authenticated
+
 @Path("/tiposPractica")
 @Produces(MediaType.APPLICATION_JSON)
 public class TipoPracticaResource {
@@ -45,7 +42,6 @@ public class TipoPracticaResource {
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response crear(TipoPractica tipo) {
         service.crear(tipo);
         return Response.status(Response.Status.CREATED).build();
@@ -53,13 +49,11 @@ public class TipoPracticaResource {
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response actualizar(TipoPractica tipo) {
         service.actualizar(tipo);
         return Response.ok().build();
     }
 
-    /** Estructura de salida: no se devuelve la entidad JPA directamente. */
     public static class TipoPracticaResponse {
 
         private final Long id;

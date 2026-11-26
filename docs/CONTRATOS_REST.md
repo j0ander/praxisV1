@@ -7,6 +7,7 @@
 - JSON en UTF-8 (`Content-Type: application/json`).
 - Nombres de campos en `camelCase`, iguales a los atributos de las entidades.
 - Identificadores numéricos (`Long`). Fechas calendario `yyyy-MM-dd`; fechas con hora en ISO 8601 con zona (`OffsetDateTime`).
+- Las fechas automáticas compatibles que se generan en código usan `LocalDate.now()`. No se configura zona horaria de negocio en la aplicación: las columnas `TIMESTAMPTZ` gestionadas por la base (`created_at`, `updated_at`) se conservan y se leen como `OffsetDateTime`, sin convertirlas a `LocalDate`.
 - Los listados no se paginan en el MVP; la paginación es una mejora futura (CR-7).
 - Los filtros se envían como parámetros de consulta y son opcionales.
 
@@ -24,21 +25,16 @@ Se sigue el patrón del módulo de referencia (`ARQUITECTURA.md` §10), y las ac
 
 Las rutas se escriben **relativas a la raíz, sin prefijo `/api`**, según `ARQUITECTURA.md` §10 (CR-1). El módulo de referencia usa `/facultades`. Las rutas del frontend React (por ejemplo `/empresas`) son rutas de la interfaz y no colisionan con los recursos JSON del backend.
 
-### 1.3. Autorización
+### 1.3. Roles: referencia de dominio, no autorización
 
-- La columna "Roles" usa estas abreviaturas: ADM administrador, COO coordinador, EST estudiante, DOC docente tutor, TUT tutor empresarial, REP representante empresarial, AUT autoridad, "Todos" cualquier autenticado.
-- Todos los endpoints, salvo `API-001`, exigen sesión (401 sin ella).
-- El rol se declara en el Resource con `@RolesAllowed` (403). El Service comprueba propiedad y ámbito; un registro ajeno o fuera del ámbito devuelve 404 (`SEGURIDAD.md` §3).
-- La sesión es una sesión tradicional del servidor Quarkus identificada por una cookie HttpOnly (`ARQUITECTURA.md` §11); no se usan JWT, Bearer tokens ni refresh tokens.
-- La cookie usa `HttpOnly`, `Secure` (en HTTPS) y `SameSite` apropiado (`ARQUITECTURA.md` §11, `SEGURIDAD.md` §6). La protección CSRF queda fuera del MVP como mejora futura de seguridad; no se valida en las operaciones de escritura.
-- Los permisos de la matriz de `SEGURIDAD.md` §4.2 están resueltos (CR-5): la administración de estructura y usuarios es solo de ADM, recomendar es solo de REP de su empresa y AUT consulta auditoría.
+La columna "Roles" de las tablas de endpoints usa las abreviaturas ADM (administrador), COO (coordinador), EST (estudiante), DOC (docente tutor), TUT (tutor empresarial), REP (representante empresarial) y AUT (autoridad). **No está vigente como control de acceso**: no hay sesión, identidad de actor, `@RolesAllowed` ni verificación de permisos en la API. Los roles se conservan como datos de dominio (`rol`, `usuario_rol`) y el login básico los devuelve solo para que React oculte o muestre pantallas. Las reglas académicas y de negocio de cada operación sí siguen vigentes.
 
 ### 1.4. Reglas de entrada y salida
 
-1. La identidad del usuario autenticado siempre procede de `SecurityIdentity` (`praxis.usuarioId`); el cliente nunca envía un `usuarioId` que determine quién es el actor. **Aclaración (TK-018):** la regla general prohíbe enviar estado, fechas de resolución, quién resolvió, la empresa derivada del ámbito del actor ni `creadaPorUsuarioId`. En `Convenio`, `empresaId` es la empresa titular del convenio y, conforme a §4.1 (API-044 y API-045), se envía como dato obligatorio y se valida contra `empresa`; no identifica al actor ni sustituye la comprobación de ámbito. **Aclaración (TK-019):** en API-048 a API-053 la empresa se identifica exclusivamente por el parámetro de ruta `{empresaId}`; `empresaId` no se envía en el cuerpo. Identifica la empresa titular de la membresía o del tutor, no al usuario actor, y el Service comprueba el ámbito. **Regla de seguridad (Bloque 2):** `empresaId` puede recibirse en rutas o cuerpos cuando el contrato aprobado lo establece; recibirlo no implica confiar en él. El Service valida siempre existencia, pertenencia y ámbito de autorización, y responde 404 ante un identificador ajeno o fuera de ámbito. API-086 no acepta `empresaId` ni `usuarioId` del cliente: deriva el ámbito del actor autenticado.
+1. No hay usuario autenticado ni actor en la API: no se usa `SecurityIdentity` (`praxis.usuarioId`) y el cliente no puede enviar un identificador que determine quién es el actor. **Aclaración (TK-018):** no se envían estado, fechas de resolución, quién resolvió, la empresa derivada del ámbito de un actor ni `creadaPorUsuarioId`. En `Convenio`, `empresaId` es la empresa titular del convenio y, conforme a §4.1 (API-044 y API-045), se envía como dato obligatorio y se valida contra `empresa`. **Aclaración (TK-019):** en API-048 a API-053 la empresa se identifica exclusivamente por el parámetro de ruta `{empresaId}`; `empresaId` no se envía en el cuerpo. Identifica la empresa titular de la membresía o del tutor, no a un usuario actor; el Service valida su existencia y sus reglas de negocio.
 2. **Entrada:** las entidades se reciben directamente cuando no contienen datos sensibles (`ARQUITECTURA.md` §8); las estructuras de entrada compuestas se declaran como clases internas del Resource. **Salida:** el Service gestiona la lógica de negocio y el Resource construye respuestas REST explícitas como clases internas; ninguna entidad JPA ni proyección de vista se devuelve ni se serializa directamente al cliente, ni en operaciones individuales ni en listados. No se introducen DTOs independientes ni mappers adicionales. **TK-019:** las entradas de API-049 y API-050 son la entidad `EmpresaUsuario` y las de API-052 y API-053 la entidad `TutorEmpresarial` (ninguna contiene datos sensibles); el Service valida los campos inmutables y el Resource construye las respuestas con las clases internas `MiembroResumen` y `TutorEmpresarialResponse`. No se declaran clases internas de entrada ni DTOs independientes para estas operaciones.
-3. `Usuario` nunca se devuelve como entidad: `hashPassword`, `intentosFallidos` y `bloqueadoHasta` llevan `@JsonIgnore` o se usa una estructura propia.
-4. Toda operación de escritura se ejecuta con el usuario autenticado fijado en la transacción (`praxis.usuario_id`); rechazos, cancelaciones y correcciones fijan además `praxis.motivo` (`MODELO_DATOS.md` §7.3). **TK-019:** API-049 y API-050 fijan el actor con `ContextoActorService` dentro de la transacción y antes de escribir `empresa_usuario`, para satisfacer `trg_validar_empresa_usuario` y `trg_auditar_empresa_usuario`. El identificador se toma de la sesión, nunca del cuerpo. API-048, API-051, API-052 y API-053 no requieren ese contexto. No se introduce `ContextoTransaccional`, contexto global ni limpieza manual.
+3. `Usuario` nunca se devuelve como entidad: `hashPassword`, `intentosFallidos` y `bloqueadoHasta` nunca se serializan; se usa una estructura propia.
+4. El contexto de actor (`praxis.usuario_id`, `praxis.motivo`) ya no se fija desde la aplicación (`CONTEXTO_ACTOR.md`). Los triggers de la base que lo requieren pueden rechazar la escritura; no se altera el esquema ni se desactivan triggers. **TK-018:** las escrituras de `empresa` y `convenio` no tenían un trigger que exigiera este contexto. **TK-019:** API-049 y API-050 escriben `empresa_usuario`, donde los triggers `validar_empresa_usuario` y `auditar_empresa_usuario` leen `praxis.usuario_id`. No se introduce `ContextoTransaccional`, contexto global ni limpieza manual.
 5. Algunos valores guardados pueden diferir de los enviados por acción de los triggers; los endpoints devuelven el valor final.
 6. No hay `DELETE` salvo en facultad (módulo de referencia) y perfil de oferta. En lo demás se desactiva con `PUT`. El `DELETE` de facultad se conserva en el contrato (API-009), respeta la integridad referencial y devuelve 409 si existen carreras asociadas; la interfaz no lo expone y solo ofrece desactivar.
 7. La concurrencia básica del MVP usa `@Version` en `postulacion` y `practica`, comprueba la disponibilidad de plazas dentro de la transacción y responde 409 `CONFLICTO_CONCURRENCIA` cuando otra operación ocupó la plaza o cambió el registro. Aceptar una postulación y crear su práctica se ejecutan en una misma transacción. No se usan mecanismos avanzados de concurrencia.
@@ -49,27 +45,20 @@ Las rutas se escriben **relativas a la raíz, sin prefijo `/api`**, según `ARQU
 | HTTP | Cuándo |
 |---|---|
 | 400 | Cuerpo o parámetros con formato inválido. |
-| 401 | Sin sesión o sesión vencida. |
-| 403 | Rol sin permiso para la operación. |
-| 404 | Registro inexistente, ajeno o fuera del ámbito. |
+| 404 | Registro inexistente. |
 | 500 | Error interno, sin detalles. |
 
-En las tablas solo se listan los errores adicionales (409).
+El único 401 del proyecto corresponde al login básico. No se devuelve 403: no hay autorización por rol en la API. En las tablas solo se listan los errores adicionales (409).
 
-## 2. Autenticación y sesión
+## 2. Login básico de prototipo (sin sesión)
 
-Decisión oficial (CR-2, `ARQUITECTURA.md` §11): autenticación con **sesiones tradicionales del servidor Quarkus** y **cookie de sesión HttpOnly**, con contraseñas verificadas mediante BCrypt. No se usan JWT, Bearer tokens, refresh tokens ni autenticación basada en tokens.
+`POST /usuarios/login` recibe `{ "correo": "...", "password": "..." }`, verifica la cuenta activa y la contraseña con `BcryptUtil.matches`, y responde 200 con `LoginResponse`: `id`, `nombres`, `apellidos`, `correo` y `roles`. No crea cookie, token, sesión de servidor ni identidad de petición: React conserva la respuesta solo en memoria mientras la aplicación está abierta.
 
-Flujo: el usuario envía correo y contraseña; Quarkus verifica las credenciales con BCrypt; si son válidas, crea la sesión y devuelve la cookie; el navegador la envía en las siguientes peticiones; Quarkus comprueba la sesión y los permisos; el cierre de sesión invalida la sesión. Una petición sin sesión válida responde 401. La protección CSRF queda fuera del MVP como mejora futura de seguridad; no se valida en las operaciones de escritura.
+Las credenciales inválidas responden 401 `CREDENCIALES_INVALIDAS` con el mensaje genérico «Correo o contraseña incorrectos.», sin distinguir correo inexistente, cuenta inactiva ni contraseña incorrecta. El hash nunca se devuelve ni se registra.
 
-| ID | Método y ruta | Descripción | Roles | Entrada | Respuesta | Errores | Refs |
-|---|---|---|---|---|---|---|---|
-| API-001 | `POST /auth/login` | Inicia sesión: verifica credenciales con BCrypt, crea la sesión del servidor y devuelve la cookie HttpOnly. Reinicia intentos fallidos y registra `ultimoLogin`. | Público | `CredencialesRequest` | 200 `SesionResponse` | 401 genérico para credenciales incorrectas, cuenta inactiva o bloqueada | RF-002, RF-003; RN-002 |
-| API-002 | `POST /auth/logout` | Invalida la sesión del servidor y la cookie. | Todos | – | 204 | – | RF-002 |
-| API-003 | `GET /auth/yo` | Datos del usuario actual y sus roles. | Todos | – | 200 `SesionResponse` | – | RF-002 |
-| API-004 | `POST /auth/cambiarPassword` | Cambia la contraseña propia; apaga `debeCambiarPassword`. **Pendiente: no implementada en Fase 5.** | Todos | `CambioPasswordRequest` | 204 | 409 contraseña actual incorrecta o política no cumplida | RF-003; RN-002 |
+API-001 a API-004 (`/auth/login`, `/auth/logout`, `/auth/yo` y `/auth/cambiarPassword`) siguen **no vigentes** y quedan pendientes a futuro. No hay rutas `/auth`, ni cookies, ni `SesionResponse`, `CredencialesRequest` ni `CambioPasswordRequest`. Tampoco hay intentos fallidos, bloqueos ni caducidades de sesión.
 
-**Estado de API-004:** el indicador `debeCambiarPassword` se registra al crear o restablecer contraseñas (API-026 y API-030), pero no produce una restricción de acceso efectiva: no hay endpoint, no hay redirección obligatoria y no se bloquean operaciones por ese indicador. La pantalla UI-002 y su redirección desde `/login` son diseño documentado, no funcionalidad implementada. No se modificó el login, la sesión ni la cookie para implementarla.
+La tabla `usuario` mantiene sus columnas existentes porque el esquema no se cambia; las columnas de intentos, bloqueo y `ultimo_login` no se usan (`SEGURIDAD.md`, `MODELO_DATOS.md` §4.2).
 
 ## 3. Endpoints por módulo
 
@@ -109,7 +98,7 @@ Nota: `FacultadResponse`, `CarreraResponse`, `PeriodoAcademicoResponse` y `TipoP
 | API-027 | `PUT /usuarios` | Actualiza datos personales. | ADM | `UsuarioRequest` (con `id`) | 200 `UsuarioResumen` | 409 duplicado | RF-001 |
 | API-028 | `POST /usuarios/{id}/activar` | Reactiva la cuenta. | ADM | – | 200 | – | RF-001 |
 | API-029 | `POST /usuarios/{id}/desactivar` | Desactiva la cuenta. | ADM | – | 200 | – | RF-001 |
-| API-030 | `POST /usuarios/{id}/restablecerPassword` | Fija contraseña temporal y `debeCambiarPassword`. | ADM | `RestablecerPasswordRequest` | 204 | – | RF-003 |
+| API-030 | `POST /usuarios/{id}/restablecerPassword` | **No vigente; pendiente a futuro.** Fijaba contraseña temporal y `debeCambiarPassword`. | ADM | `RestablecerPasswordRequest` | 204 | – | RF-003 |
 | API-031 | `PUT /usuarios/{id}/roles` | Reemplaza los roles. Al asignar `DOCENTE` el perfil se crea automáticamente. | ADM | `AsignarRolesRequest` | 200 | 409 rol inexistente | RF-002; RN-003, RN-004 |
 | API-032 | `PUT /usuarios/{id}/carreras` | Reemplaza las carreras del ámbito. | ADM | `AsignarCarrerasRequest` | 200 | 409 carrera inexistente | RF-002; RN-003 |
 | API-033 | `GET /estudiantes/listarTodos?carreraId=` | Lista perfiles de estudiante. | ADM, COO (ámbito) | – | 200 `EstudianteResponse[]` | – | RF-005 |
@@ -132,23 +121,22 @@ Nota: `FacultadResponse`, `CarreraResponse`, `PeriodoAcademicoResponse` y `TipoP
 | API-045 | `PUT /convenios` | Actualiza datos del convenio. | ADM, COO | `Convenio` | 200 | 409 fechas incoherentes | RF-008 |
 | API-046 | `POST /convenios/{id}/suspender` | Pasa a `SUSPENDIDO`. | ADM, COO | – | 200 | – | RN-010 |
 | API-047 | `POST /convenios/{id}/terminar` | Pasa a `TERMINADO`. | ADM, COO | – | 200 | – | RN-010 |
-| API-048 | `GET /empresas/{empresaId}/miembros` | Lista miembros de la empresa. | ADM, COO, REP (`ADMIN_EMPRESA`, la propia) | – | 200 `MiembroResumen[]` | 401, 403, 404 por ámbito | RF-007 |
+| API-048 | `GET /empresas/{empresaId}/miembros` | Lista miembros de la empresa. | ADM, COO, REP (`ADMIN_EMPRESA`, la propia) | – | 200 `MiembroResumen[]` | 404 si la empresa o el recurso no existe | RF-007 |
 | API-049 | `POST /empresas/{empresaId}/miembros` | Vincula un usuario activo. | ADM, COO, REP (`ADMIN_EMPRESA`, la propia) | `EmpresaUsuario` | 201 `MiembroResumen` | 400 `activo=false`, campo inmutable u otro dato inválido; 404 empresa o usuario inexistente; 409 `REGLA_NEGOCIO` (empresa inactiva, usuario inactivo o sin rol REP, primer miembro no ADMIN); 409 `DUPLICADO` | RF-007; RN-009 |
 | API-050 | `PUT /empresas/{empresaId}/miembros/{id}` | Cambia rol de empresa o activa/desactiva. | ADM, COO, REP (`ADMIN_EMPRESA`, la propia) | `EmpresaUsuario` | 200 `MiembroResumen` | 400 campo inmutable u otro dato inválido; 404 membresía ajena a la empresa; 409 `REGLA_NEGOCIO` si la empresa quedaría sin administrador activo | RN-009 |
-| API-051 | `GET /empresas/{empresaId}/tutores` | Lista tutores empresariales de la empresa. | ADM, COO, REP (la propia) | – | 200 `TutorEmpresarialResponse[]` | 401, 403, 404 por ámbito | RF-007 |
+| API-051 | `GET /empresas/{empresaId}/tutores` | Lista tutores empresariales de la empresa. | ADM, COO, REP (la propia) | – | 200 `TutorEmpresarialResponse[]` | 404 si la empresa o el recurso no existe | RF-007 |
 | API-052 | `POST /empresas/{empresaId}/tutores` | Registra un tutor de la empresa. | ADM, COO | `TutorEmpresarial` | 201 `TutorEmpresarialResponse` | 400 campo inmutable u otro dato inválido; 404 empresa o usuario inexistente; 409 `REGLA_NEGOCIO` (usuario inactivo o sin rol `TUTOR_EMPRESARIAL` activo); 409 `DUPLICADO` si ya es tutor de otra empresa | RF-007; RN-009 |
 | API-053 | `PUT /empresas/{empresaId}/tutores` | Actualiza el cargo del tutor. | ADM, COO | `TutorEmpresarial` | 200 `TutorEmpresarialResponse` | 400 campo inmutable u otro dato inválido; 404 si el tutor no pertenece a la empresa de la ruta | RF-007 |
-| API-086 | `GET /empresas/miEmpresa` | Obtiene la empresa del representante con membresía activa `ADMIN_EMPRESA`. La empresa inactiva también se devuelve. Sin parámetros: el usuario se obtiene de `SecurityIdentity` (`praxis.usuarioId`). | REP (membresía activa `ADMIN_EMPRESA`) | – | 200 `MiEmpresaResponse` | 401 `SIN_SESION`; 403 `SIN_PERMISO` si el rol global no autoriza; 404 `NO_ENCONTRADO` si no hay membresía activa `ADMIN_EMPRESA`; 409 `REGLA_NEGOCIO` si hay más de una membresía activa `ADMIN_EMPRESA` | RF-007; RN-009 |
+
+**API-086 (`GET /empresas/miEmpresa`) no está vigente** y queda pendiente a futuro: dependía de un usuario autenticado y de una membresía activa `ADMIN_EMPRESA`. La estructura de salida `MiEmpresaResponse` tampoco está vigente. La interfaz de empresa es únicamente el detalle institucional de `UI-011` sobre `/empresas/:id` (`INTERFACES.md`).
 
 **Notas de API-048 a API-053 (TK-019):**
 
-- Códigos comunes: 401 sin sesión; 403 sin rol autorizado; 404 empresa o recurso inexistente, ajeno o fuera del ámbito; 400 `DATOS_INVALIDOS` por campo obligatorio ausente, formato inválido o envío de campos inmutables; 409 `REGLA_NEGOCIO` por incumplimiento de una regla de negocio; 409 `DUPLICADO` por restricción única. Formato de error según §6.
+- Códigos comunes: 404 empresa o recurso inexistente; 400 `DATOS_INVALIDOS` por campo obligatorio ausente, formato inválido o envío de campos inmutables; 409 `REGLA_NEGOCIO` por incumplimiento de una regla de negocio; 409 `DUPLICADO` por restricción única. Formato de error según §6.
 - La empresa se identifica solo con `{empresaId}` en la ruta de API-048 a API-053. El Service verifica el ámbito: ADM y COO sin límite de empresa; REP únicamente sobre la suya, con `ADMIN_EMPRESA` activo en API-048 a API-050. API-051 conserva el acceso de REP a su empresa para consultar tutores; API-052 y API-053 son exclusivas de ADM y COO.
 - Las bajas de miembros son lógicas (`activo=false` en API-050): `empresa_usuario` no se elimina físicamente.
 - Decisión aprobada para TK-020: en UI-011 el representante `ADMIN_EMPRESA` consulta tutores (API-051) en solo lectura; no crea ni edita tutores (API-052 y API-053 continúan restringidas a ADM y COO) y no edita convenios (API-044 a API-047 permanecen restringidas a ADM y COO).
 - Cuerpo de respuesta: API-049 y API-050 devuelven `MiembroResumen`; API-052 y API-053 devuelven `TutorEmpresarialResponse`, conforme a §4.2 y §5. API-048 y API-051 devuelven los arreglos `MiembroResumen[]` y `TutorEmpresarialResponse[]`, respectivamente.
-
-**Nota de API-086 (TK-020):** la operación es exclusiva de `REPRESENTANTE_EMPRESA` con membresía activa `ADMIN_EMPRESA`; un `PUBLICADOR` no puede utilizarla. El usuario autenticado se obtiene de `SecurityIdentity` mediante el atributo `praxis.usuarioId`; no se aceptan `usuarioId` ni `empresaId` del cliente. Si no existe una membresía activa `ADMIN_EMPRESA`, se responde 404 `NO_ENCONTRADO` sin revelar información de otras empresas. Si existen varias membresías activas `ADMIN_EMPRESA`, se responde 409 `REGLA_NEGOCIO` sin seleccionar una arbitrariamente ni revelar identificadores de empresas. La empresa inactiva permanece visible para su `ADMIN_EMPRESA` y se reporta mediante `activa`. La respuesta contiene únicamente `empresaId`, `ruc`, `razonSocial`, `activa` y `rolEmpresa`; no incluye credenciales, datos de sesión, información de otras empresas ni campos internos innecesarios.
 
 ### 3.4. Ofertas
 
@@ -175,7 +163,7 @@ El cierre automático de ofertas vencidas lo ejecuta un proceso del sistema (`ce
 
 | ID | Método y ruta | Descripción | Roles | Entrada | Respuesta | Errores | Refs |
 |---|---|---|---|---|---|---|---|
-| API-068 | `POST /postulaciones` | El estudiante autenticado se postula a un perfil; queda `PENDIENTE`. | EST | `PostulacionRequest` | 201 `PostulacionDetalle` | 409 `REGLA_NEGOCIO` oferta no publicada o vencida; convenio no vigente; carrera no incluida; sin plazas; requisitos incumplidos; 409 `DUPLICADO` postulación existente | RF-013; RN-017 |
+| API-068 | `POST /postulaciones` | Registra la postulación de un estudiante a un perfil; queda `PENDIENTE`. | EST | `PostulacionRequest` | 201 `PostulacionDetalle` | 409 `REGLA_NEGOCIO` oferta no publicada o vencida; convenio no vigente; carrera no incluida; sin plazas; requisitos incumplidos; 409 `DUPLICADO` postulación existente | RF-013; RN-017 |
 | API-069 | `GET /postulaciones/listarMias` | Postulaciones del estudiante. | EST | – | 200 `PostulacionResumen[]` | – | RF-013 |
 | API-070 | `GET /postulaciones/listarGestion?estado=&ofertaId=&recomendacion=` | Postulaciones del ámbito. | COO | – | 200 `PostulacionResumen[]` | – | RF-015 |
 | API-071 | `GET /postulaciones/listarPorOferta/{ofertaId}` | Postulantes de una oferta de la empresa. | REP, COO | – | 200 `PostulacionResumen[]` | – | RF-014 |
@@ -207,9 +195,7 @@ Las entradas son entidades del dominio cuando no contienen datos sensibles; las 
 
 ### 4.1. Entrada
 
-**CredencialesRequest:** `correo` (String, sí), `password` (String, sí).
-**CambioPasswordRequest:** `passwordActual` (sí), `passwordNueva` (sí).
-**RestablecerPasswordRequest:** `passwordTemporal` (sí).
+**RestablecerPasswordRequest:** `passwordTemporal` (sí). No vigente; pendiente a futuro (API-030).
 **UsuarioRequest:** `id` (solo en PUT), `correo`, `nombres`, `apellidos`, `tipoDocumento` (`CEDULA` o `PASAPORTE`), `numeroDocumento`, `telefono`, `alcanceGlobal`, `passwordTemporal` (solo al crear). El correo se guarda en minúsculas.
 **AsignarRolesRequest:** `roles` (String[] con códigos de rol).
 **AsignarCarrerasRequest:** `carreraIds` (Long[]).
@@ -244,7 +230,7 @@ Las entradas son entidades del dominio cuando no contienen datos sensibles; las 
 
 ### 4.2. Salida compuesta
 
-Las estructuras `FacultadResponse`, `CarreraResponse`, `PeriodoAcademicoResponse`, `TipoPracticaResponse`, `EstudianteResponse`, `DocenteResponse`, `EmpresaResponse`, `MiEmpresaResponse`, `MiembroResumen`, `TutorEmpresarialResponse` y `AuditoriaResponse` son clases internas del Resource correspondiente. Sus campos se toman de `MODELO_DATOS.md` §4; no se crean DTOs independientes ni se serializan entidades JPA.
+Las estructuras `FacultadResponse`, `CarreraResponse`, `PeriodoAcademicoResponse`, `TipoPracticaResponse`, `EstudianteResponse`, `DocenteResponse`, `EmpresaResponse`, `MiembroResumen`, `TutorEmpresarialResponse` y `AuditoriaResponse` son clases internas del Resource correspondiente. Sus campos se toman de `MODELO_DATOS.md` §4; no se crean DTOs independientes ni se serializan entidades JPA.
 
 **FacultadResponse:** `id`, `codigo`, `nombre`, `activa`, `createdAt`, `updatedAt`.
 **CarreraResponse:** `id`, `facultadId`, `codigo`, `nombre`, `activa`, `createdAt`, `updatedAt`.
@@ -253,11 +239,9 @@ Las estructuras `FacultadResponse`, `CarreraResponse`, `PeriodoAcademicoResponse
 **EstudianteResponse:** `id`, `usuarioId`, `carreraId`, `codigoEstudiante`, `fechaNacimiento`, `createdAt`, `updatedAt`.
 **DocenteResponse:** `id`, `usuarioId`, `codigoDocente`, `dedicacion`, `createdAt`, `updatedAt`.
 **EmpresaResponse:** `id`, `ruc`, `razonSocial`, `nombreComercial`, `direccion`, `telefono`, `correo`, `activa`, `createdAt`, `updatedAt`.
-**MiEmpresaResponse:** `empresaId`, `ruc`, `razonSocial`, `activa`, `rolEmpresa`. Estructura mínima de API-086; `rolEmpresa` es el rol activo de la membresía `ADMIN_EMPRESA` y `activa` corresponde al estado de la empresa.
 **TutorEmpresarialResponse:** `id`, `usuarioId`, `empresaId`, `cargo`, `createdAt`, `updatedAt`.
 **AuditoriaResponse:** `id`, `usuarioId`, `accion`, `entidad`, `entidadId`, `detalle`, `fecha`.
 
-**SesionResponse:** `usuarioId`, `correo`, `nombres`, `roles`.
 **UsuarioResumen:** `id`, `correo`, `nombres`, `apellidos`, `tipoDocumento`, `numeroDocumento`, `telefono`, `activo`, `alcanceGlobal`, `roles`, `carreraIds`.
 **ConvenioResumen:** campos de `Convenio` más `estadoEfectivo` (vista `v_convenio_estado`).
 **MiembroResumen:** `id`, `usuarioId`, `nombres`, `apellidos`, `correo`, `rolEmpresa`, `activo`. Los datos de usuario (`nombres`, `apellidos`, `correo`) se obtienen con una proyección de solo lectura; no se serializa la entidad `Usuario` ni se exponen sus campos internos.
@@ -279,11 +263,11 @@ Las operaciones cuya respuesta se indica solo como 200 o 201 sin tipo (por ejemp
 - Consulta, actualización y acciones de negocio: 200 con el recurso.
 - Sin contenido: 204.
 - Los listados devuelven un arreglo JSON; vacío si no hay resultados (nunca 404).
-- En TK-019, los recursos creados o actualizados son `MiembroResumen` (API-049 y API-050) y `TutorEmpresarialResponse` (API-052 y API-053); las consultas devuelven `MiembroResumen[]` (API-048) y `TutorEmpresarialResponse[]` (API-051). En TK-020, API-086 devuelve `MiEmpresaResponse`.
+- En TK-019, los recursos creados o actualizados son `MiembroResumen` (API-049 y API-050) y `TutorEmpresarialResponse` (API-052 y API-053); las consultas devuelven `MiembroResumen[]` (API-048) y `TutorEmpresarialResponse[]` (API-051).
 
 ## 6. Manejo de errores
 
-Formato aprobado (`SEGURIDAD.md` §7.2). Estructura uniforme:
+Formato uniforme:
 
 ```json
 { "codigo": "REGLA_NEGOCIO", "mensaje": "La oferta no tiene plazas disponibles." }
@@ -292,15 +276,14 @@ Formato aprobado (`SEGURIDAD.md` §7.2). Estructura uniforme:
 | HTTP | `codigo` | Causa |
 |---|---|---|
 | 400 | `DATOS_INVALIDOS` | Formato o campo obligatorio faltante. |
-| 401 | `SIN_SESION` | Sin sesión. En el inicio de sesión el mensaje es siempre genérico. |
-| 403 | `SIN_PERMISO` | El rol no permite la operación. |
-| 404 | `NO_ENCONTRADO` | Inexistente, ajeno o fuera del ámbito. |
+| 401 | `CREDENCIALES_INVALIDAS` | Solo `POST /usuarios/login`: correo o contraseña incorrectos, o cuenta inactiva. |
+| 404 | `NO_ENCONTRADO` | Registro inexistente. |
 | 409 | `REGLA_NEGOCIO` | Incumple una regla (RN) o un trigger rechaza la operación; el mensaje indica la causa. |
 | 409 | `DUPLICADO` | Restricción única de la base. |
 | 409 | `CONFLICTO_CONCURRENCIA` | Conflicto de `version` en `postulacion` o `practica`, o plaza ocupada por otra operación al aceptar una postulación. |
 | 500 | `ERROR_INTERNO` | Mensaje genérico. |
 
-Los códigos 409 se aplican así: `REGLA_NEGOCIO` a incumplimientos de condiciones del proceso, incluida la integridad referencial (hay registros dependientes; API-009 y API-061) y la existencia de varias membresías activas `ADMIN_EMPRESA` en API-086; `DUPLICADO` a registros existentes o restricciones únicas; `CONFLICTO_CONCURRENCIA` a conflictos de `version` o a la plaza ocupada por otra aceptación concurrente. No se añaden otros códigos.
+Los códigos 409 se aplican así: `REGLA_NEGOCIO` a incumplimientos de condiciones del proceso, incluida la integridad referencial (hay registros dependientes; API-009 y API-061); `DUPLICADO` a registros existentes o restricciones únicas; `CONFLICTO_CONCURRENCIA` a conflictos de `version` o a la plaza ocupada por otra aceptación concurrente. El código 401 se reserva al login básico descrito en §2; no se añaden otros códigos.
 
 Los errores nunca incluyen SQL, rutas, trazas ni datos de credenciales. Los errores de triggers diferidos aparecen al confirmar la transacción y se traducen con el mismo formato.
 
@@ -313,10 +296,10 @@ No aplica. `ARQUITECTURA.md` define React como interfaz; el backend solo expone 
 | # | Decisión resuelta | Alcance |
 |---|---|---|
 | CR-1 | Rutas sin prefijo `/api`, relativas a la raíz (`ARQUITECTURA.md` §10). | MVP |
-| CR-2 | Sesiones tradicionales del servidor Quarkus con cookie HttpOnly y BCrypt; sin JWT (`ARQUITECTURA.md` §11). | MVP |
-| CR-3 | Seguridad básica; parámetros de bloqueo configurables sin valores fijos. Mejoras avanzadas, futuras. | MVP / futura |
-| CR-4 | Corrección administrativa de decisiones: ADM o COO de ámbito, motivo y auditoría, sin cambio de estado. | MVP |
-| CR-5 | COO No (estructura y usuarios), TUT No (recomendar), AUT Sí (auditoría). | MVP |
+| CR-2 | Vigente solo el login básico de prototipo (`POST /usuarios/login`): valida credenciales con BCrypt y entrega datos al cliente, sin sesión ni cookies. Sesiones, cookies y autenticación de la API siguen pendientes. |
+| CR-3 | **No vigente; pendiente a futuro.** Seguridad de cuentas, intentos y bloqueos. |
+| CR-4 | Corrección de decisiones con motivo y auditoría, sin cambio de estado. La restricción por rol o ámbito no está vigente. | MVP |
+| CR-5 | **No vigente como autorización.** Existe una matriz visual de módulos por rol en React; no restringe llamadas REST. |
 | CR-6 | Validaciones académicas en postulación, en el MVP; módulo de requisitos y reportes, futuros. | MVP / futura |
 | CR-7 | Listados sin paginación en el MVP; paginación futura. | MVP / futura |
 | CR-8 | Asignación de responsables y fechas en el MVP; `iniciar` (API-083) y etapas posteriores, futuras. | MVP / futura |

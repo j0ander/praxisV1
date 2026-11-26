@@ -13,7 +13,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Entidad de la tabla tipo_practica (MODELO_DATOS.md §4.15). */
+
 @Entity
 @Table(name = "tipo_practica")
 public class TipoPractica {

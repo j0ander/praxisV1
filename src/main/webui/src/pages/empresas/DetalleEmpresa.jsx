@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
 import Pestanas from '../../components/comunes/Pestanas';
 import RutaEnlace from '../../components/comunes/RutaEnlace';
-import { useSesion } from '../../contextos/SesionContexto';
 import { mensajeDeError } from '../../services/api';
 import { buscarEmpresa } from '../../services/empresaService';
 import ConveniosEmpresa from './ConveniosEmpresa';
@@ -18,28 +17,12 @@ const PESTANAS = [
   { id: 'tutores', etiqueta: 'Tutores empresariales' },
 ];
 
-/**
- * UI-011. El contexto de navegación, no la mera presencia de roles, decide los
- * permisos de la pantalla: `/empresas/:id` es institucional y `/mi-empresa` es
- * el ámbito de la empresa validado por API-086.
- */
-export default function DetalleEmpresa({ id, contexto }) {
-  const { tieneRol } = useSesion();
-  const rutaRetorno = contexto === 'miEmpresa' ? '/mi-empresa' : '/empresas';
-  const esInstitucional = contexto === 'institucional'
-    && tieneRol('ADMINISTRADOR', 'COORDINADOR');
-  const esRepresentante = contexto === 'miEmpresa'
-    && tieneRol('REPRESENTANTE_EMPRESA');
-  const puedeEditarDatos = esInstitucional || esRepresentante;
-  const puedeGestionarMiembros = esInstitucional || esRepresentante;
-  const puedeGestionarConvenios = esInstitucional;
-  const puedeGestionarTutores = esInstitucional;
+export default function DetalleEmpresa({ id }) {
   const [empresa, setEmpresa] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [pestana, setPestana] = useState('datos');
 
-  // Al cambiar de empresa se vuelve siempre a la pestaña inicial.
   useEffect(() => {
     setPestana('datos');
   }, [id]);
@@ -57,15 +40,6 @@ export default function DetalleEmpresa({ id, contexto }) {
     cargar();
   }, [cargar]);
 
-  if (!esInstitucional && !esRepresentante) {
-    return (
-      <>
-        <RutaEnlace a={rutaRetorno} className="boton boton--secundario">Volver</RutaEnlace>
-        <MensajeEstado tipo="error" mensaje="Contexto de acceso no válido para esta pantalla." />
-      </>
-    );
-  }
-
   if (cargando && !empresa) {
     return <MensajeEstado mensaje="Cargando empresa…" />;
   }
@@ -73,9 +47,7 @@ export default function DetalleEmpresa({ id, contexto }) {
   if (!empresa) {
     return (
       <>
-        <RutaEnlace a={rutaRetorno} className="boton boton--secundario">
-          {esInstitucional ? 'Volver al listado' : 'Volver a Mi empresa'}
-        </RutaEnlace>
+        <RutaEnlace a="/empresas" className="boton boton--secundario">Volver al listado</RutaEnlace>
         <MensajeEstado tipo="error" mensaje={error} onReintentar={cargar} />
       </>
     );
@@ -88,9 +60,7 @@ export default function DetalleEmpresa({ id, contexto }) {
           <h1>{empresa.razonSocial}</h1>
           <p>RUC {empresa.ruc}</p>
         </div>
-        <RutaEnlace a={rutaRetorno} className="boton boton--secundario">
-          {esInstitucional ? 'Volver al listado' : 'Volver a Mi empresa'}
-        </RutaEnlace>
+        <RutaEnlace a="/empresas" className="boton boton--secundario">Volver al listado</RutaEnlace>
       </div>
 
       <MensajeEstado tipo="error" mensaje={error} onReintentar={cargar} />
@@ -99,16 +69,16 @@ export default function DetalleEmpresa({ id, contexto }) {
 
       <div className="tarjeta" role="tabpanel">
         {pestana === 'datos' ? (
-          <DatosEmpresa empresa={empresa} puedeEditar={puedeEditarDatos} onGuardada={cargar} />
+          <DatosEmpresa empresa={empresa} puedeEditar onGuardada={cargar} />
         ) : null}
         {pestana === 'convenios' ? (
-          <ConveniosEmpresa empresaId={empresa.id} puedeEditar={puedeGestionarConvenios} />
+          <ConveniosEmpresa empresaId={empresa.id} puedeEditar />
         ) : null}
         {pestana === 'miembros' ? (
-          <MiembrosEmpresa empresaId={empresa.id} puedeGestionar={puedeGestionarMiembros} />
+          <MiembrosEmpresa empresaId={empresa.id} puedeGestionar />
         ) : null}
         {pestana === 'tutores' ? (
-          <TutoresEmpresa empresaId={empresa.id} puedeGestionar={puedeGestionarTutores} />
+          <TutoresEmpresa empresaId={empresa.id} puedeGestionar />
         ) : null}
       </div>
     </>

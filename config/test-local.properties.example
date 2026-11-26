@@ -1,6 +1,0 @@
-# Plantilla para config/test-local.properties (no versionar el archivo real).
-# Solo se usa para pruebas unitarias contra la base aislada local; nunca Supabase.
-# Copia este archivo como config/test-local.properties y reemplaza el marcador.
-# Al ejecutar las pruebas, pasa este archivo con -Dquarkus.config.locations.
-
-praxis.test.datasource.password=<contrasena-de-la-base-aislada-local>

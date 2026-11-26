@@ -9,7 +9,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 
-/** Persistencia de tutores empresariales (API-051 a API-053). */
+
 @ApplicationScoped
 public class TutorEmpresarialRepository implements PanacheRepositoryBase<TutorEmpresarial, Long> {
 
@@ -34,9 +34,9 @@ public class TutorEmpresarialRepository implements PanacheRepositoryBase<TutorEm
     public TutorEmpresarial buscarPorIdYEmpresa(Long id, Long empresaId) {
         try {
             return em.createQuery(JPQ_BUSCAR, TutorEmpresarial.class)
-                    .setParameter("id", id)
-                    .setParameter("empresaId", empresaId)
-                    .getSingleResult();
+        .setParameter("id", id)
+        .setParameter("empresaId", empresaId)
+        .getSingleResult();
         } catch (NoResultException e) {
             return null;
         }

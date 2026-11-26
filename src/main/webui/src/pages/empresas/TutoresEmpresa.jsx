@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Boton from '../../components/comunes/Boton';
 import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
+import SelectorUsuarios from '../../components/comunes/SelectorUsuarios';
 import Tabla from '../../components/comunes/Tabla';
 import { mensajeDeError } from '../../services/api';
 import {
@@ -63,11 +64,8 @@ export default function TutoresEmpresa({ empresaId, puedeGestionar = true }) {
 
   function validar() {
     const errores = {};
-    if (!editando) {
-      const usuarioId = Number(formulario.usuarioId);
-      if (!formulario.usuarioId || !Number.isInteger(usuarioId) || usuarioId <= 0) {
-        errores.usuarioId = 'Ingrese un id de usuario válido.';
-      }
+    if (!editando && !formulario.usuarioId) {
+      errores.usuarioId = 'Seleccione un usuario.';
     }
     return errores;
   }
@@ -145,14 +143,13 @@ export default function TutoresEmpresa({ empresaId, puedeGestionar = true }) {
               <input id="tutor-usuario-actual" value={editando.usuarioId} disabled />
             </CampoFormulario>
           ) : (
-            <CampoFormulario
+            <SelectorUsuarios
               id="tutor-usuario"
-              etiqueta="ID del usuario"
+              valor={formulario.usuarioId}
+              onChange={(valor) => cambiarCampo('usuarioId', valor)}
+              rol="TUTOR_EMPRESARIAL"
+              excluirIds={tutores.map((tutor) => tutor.usuarioId)}
               obligatorio
-              type="number"
-              min="1"
-              value={formulario.usuarioId}
-              onChange={(evento) => cambiarCampo('usuarioId', evento.target.value)}
               error={erroresCampos.usuarioId}
             />
           )}

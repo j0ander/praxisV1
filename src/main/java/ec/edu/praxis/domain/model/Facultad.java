@@ -16,7 +16,6 @@ import jakarta.persistence.Table;
 @Table(name = "facultad")
 public class Facultad {
 
-    // GENERATED ALWAYS: la base asigna el id; el código nunca lo establece.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -30,7 +29,6 @@ public class Facultad {
     @Column(name = "activa", nullable = false)
     private boolean activa = true;
 
-    // Columnas gestionadas por la base (DEFAULT NOW() y trigger set_updated_at).
     @Generated(event = EventType.INSERT)
     @Column(name = "created_at", insertable = false, updatable = false)
     private OffsetDateTime createdAt;

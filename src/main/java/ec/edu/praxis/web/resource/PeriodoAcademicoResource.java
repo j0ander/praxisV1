@@ -6,8 +6,6 @@ import java.util.List;
 
 import ec.edu.praxis.application.service.PeriodoAcademicoService;
 import ec.edu.praxis.domain.model.PeriodoAcademico;
-import io.quarkus.security.Authenticated;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -19,8 +17,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-/** API-014 a API-019: consulta y administración de periodos académicos. */
-@Authenticated
+
 @Path("/periodos")
 @Produces(MediaType.APPLICATION_JSON)
 public class PeriodoAcademicoResource {
@@ -45,7 +42,6 @@ public class PeriodoAcademicoResource {
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response crear(PeriodoAcademico periodo) {
         service.crear(periodo);
         return Response.status(Response.Status.CREATED).build();
@@ -53,7 +49,6 @@ public class PeriodoAcademicoResource {
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response actualizar(PeriodoAcademico periodo) {
         service.actualizar(periodo);
         return Response.ok().build();
@@ -61,7 +56,6 @@ public class PeriodoAcademicoResource {
 
     @POST
     @Path("/{id}/activar")
-    @RolesAllowed("ADMINISTRADOR")
     public Response activar(@PathParam("id") Long id) {
         service.activar(id);
         return Response.ok().build();
@@ -69,13 +63,11 @@ public class PeriodoAcademicoResource {
 
     @POST
     @Path("/{id}/desactivar")
-    @RolesAllowed("ADMINISTRADOR")
     public Response desactivar(@PathParam("id") Long id) {
         service.desactivar(id);
         return Response.ok().build();
     }
 
-    /** Estructura de salida: no se devuelve la entidad JPA directamente. */
     public static class PeriodoAcademicoResponse {
 
         private final Long id;

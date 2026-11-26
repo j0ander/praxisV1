@@ -12,7 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Entidad de la tabla docente (MODELO_DATOS.md §4.9). */
+
 @Entity
 @Table(name = "docente")
 public class Docente {

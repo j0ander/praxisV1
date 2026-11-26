@@ -1,9 +1,5 @@
 package ec.edu.praxis.application.service;
 
-/**
- * Excepción de negocio con el código HTTP y el código funcional definidos en
- * CONTRATOS_REST.md §6. El mensaje es siempre seguro para el cliente.
- */
 public class ApiException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
@@ -21,12 +17,8 @@ public class ApiException extends RuntimeException {
         return new ApiException(400, "DATOS_INVALIDOS", mensaje);
     }
 
-    public static ApiException sinSesion(String mensaje) {
-        return new ApiException(401, "SIN_SESION", mensaje);
-    }
-
-    public static ApiException sinPermiso(String mensaje) {
-        return new ApiException(403, "SIN_PERMISO", mensaje);
+    public static ApiException credencialesInvalidas() {
+        return new ApiException(401, "CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos.");
     }
 
     public static ApiException noEncontrado(String mensaje) {

@@ -7,9 +7,6 @@ import java.util.List;
 import ec.edu.praxis.application.service.ApiException;
 import ec.edu.praxis.application.service.EstudianteService;
 import ec.edu.praxis.domain.model.Estudiante;
-import io.quarkus.security.Authenticated;
-import io.quarkus.security.identity.SecurityIdentity;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -22,8 +19,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-/** API-033 a API-036: perfiles de estudiante. */
-@Authenticated
+
 @Path("/estudiantes")
 @Produces(MediaType.APPLICATION_JSON)
 public class EstudianteResource {
@@ -31,39 +27,32 @@ public class EstudianteResource {
     @Inject
     EstudianteService service;
 
-    @Inject
-    SecurityIdentity identity;
-
     @GET
     @Path("/listarTodos")
-    @RolesAllowed({ "ADMINISTRADOR", "COORDINADOR" })
     public Response listar(@QueryParam("carreraId") Long carreraId) {
-        List<EstudianteResponse> respuesta = service.listar(actorId(), esAdmin(), carreraId).stream()
+        List<EstudianteResponse> respuesta = service.listar(carreraId).stream()
                 .map(EstudianteResponse::new).toList();
         return Response.ok(respuesta).build();
     }
 
     @GET
     @Path("/buscar/{id}")
-    @RolesAllowed({ "ADMINISTRADOR", "COORDINADOR" })
     public Response buscar(@PathParam("id") Long id) {
-        return Response.ok(new EstudianteResponse(service.buscar(id, actorId(), esAdmin()))).build();
+        return Response.ok(new EstudianteResponse(service.buscar(id))).build();
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed({ "ADMINISTRADOR", "COORDINADOR" })
     public Response crear(Estudiante estudiante) {
-        service.crear(validar(estudiante), actorId(), esAdmin());
+        service.crear(validar(estudiante));
         return Response.status(Response.Status.CREATED).build();
     }
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed({ "ADMINISTRADOR", "COORDINADOR" })
     public Response actualizar(Estudiante estudiante) {
         Estudiante datos = validar(estudiante);
-        service.actualizar(datos.getId(), datos, actorId(), esAdmin());
+        service.actualizar(datos.getId(), datos);
         return Response.ok().build();
     }
 
@@ -74,15 +63,6 @@ public class EstudianteResource {
         return estudiante;
     }
 
-    private Long actorId() {
-        return identity.getAttribute("praxis.usuarioId");
-    }
-
-    private boolean esAdmin() {
-        return identity.hasRole("ADMINISTRADOR");
-    }
-
-    /** Estructura de salida definida en CONTRATOS_REST.md §4.2. */
     public static class EstudianteResponse {
 
         private final Long id;

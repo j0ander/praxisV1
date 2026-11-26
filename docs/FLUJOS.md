@@ -4,7 +4,7 @@
 
 Describe cómo se desarrollan los procesos principales de PRAXIS desde la perspectiva de cada actor, para comprender el producto antes de implementar sus operaciones. Las condiciones detalladas están en `REGLAS_NEGOCIO.md` (RN-) y los comportamientos requeridos en `REQUISITOS.md` (RF-); aquí solo se referencian.
 
-**Alcance del MVP:** se implementan autenticación, ofertas, postulaciones, empresas y convenios, estructura académica, usuarios, formalización, asignación de responsables y fechas, y auditoría. Los flujos `FL-010`, `FL-011`, `FL-018`, `FL-019`, `FL-020`, `FL-021` y `FL-022` (actividades y horas, informes, visitas, evaluaciones y certificados) y los reportes consolidados de `FL-024` son mejoras futuras (`PRODUCTO.md` §5 y §7; CR-6 y CR-8). `FL-017` conserva en el MVP únicamente la asignación de responsables y fechas.
+**Alcance del MVP:** se implementan ofertas, postulaciones, empresas y convenios, estructura académica, usuarios, formalización, asignación de responsables y fechas, y auditoría. Se incorpora un login básico de prototipo que verifica credenciales y filtra pantallas en React; no hay sesión ni autorización en la API (`SEGURIDAD.md`). Los flujos `FL-010`, `FL-011`, `FL-018`, `FL-019`, `FL-020`, `FL-021` y `FL-022` (actividades y horas, informes, visitas, evaluaciones y certificados) y los reportes consolidados de `FL-024` son mejoras futuras (`PRODUCTO.md` §5 y §7; CR-6 y CR-8). `FL-017` conserva en el MVP únicamente la asignación de responsables y fechas.
 
 Actores:
 
@@ -19,59 +19,15 @@ Actores:
 | Autoridad | Consulta reportes (solo lectura). |
 | Sistema | Ejecuta procesos automáticos. |
 
-## 2. Flujo de autenticación
+## 2. Flujo de acceso y contraseña
 
-### FL-001 - Inicio de sesión
-Objetivo: 
-Permitir el acceso de un usuario con cuenta habilitada.
-Actores: 
-Cualquier usuario.
-Precondiciones: 
-El usuario tiene una cuenta registrada.
-Flujo principal:
-1. El usuario ingresa su correo y contraseña.
-2. El sistema verifica que la cuenta esté activa y no bloqueada.
-3. El sistema valida las credenciales con BCrypt, reinicia el conteo de intentos fallidos y crea la sesión en el servidor.
-4. El servidor envía la cookie de sesión HttpOnly; el navegador la conserva y la envía en las siguientes peticiones.
-5. El sistema comprueba la sesión y presenta las funciones del rol del usuario.
+### FL-001 - Inicio de sesión (básico, prototipo)
+**Estado:** implementado. El usuario envía correo y contraseña a `POST /usuarios/login`; el backend verifica la cuenta activa y el hash BCrypt y devuelve datos básicos y roles. React conserva esa respuesta en memoria, muestra el menú permitido y ofrece cerrar sesión. No hay sesión del servidor, cookie, JWT ni tokens; al recargar se pide el login de nuevo. No se contabilizan intentos fallidos ni bloqueos y los roles no autorizan llamadas REST.
+**Referencias:** RF-002 y RF-003, RN-002 y RN-003. La matriz visual de módulos está en `INTERFACES.md` §2.
 
-Alternativos:
-- A1. La cuenta tiene `debe_cambiar_password`: el sistema exige cambiar la contraseña antes de continuar.
-- A2. El usuario tiene varios roles: accede a las funciones de todos ellos.
-
-Excepciones:
-- E1. Credenciales incorrectas: el sistema rechaza el acceso y suma un intento fallido.
-- E2. Se supera el límite de intentos: la cuenta se bloquea temporalmente.
-- E3. Cuenta desactivada o bloqueada: se deniega el acceso.
-- E4. Sesión ausente, vencida o inválida: se responde 401 y se solicita iniciar sesión.
-
-Nota: no se usan JWT ni tokens; la sesión es tradicional del servidor con cookie HttpOnly (`ARQUITECTURA.md` §11). El cierre de sesión invalida la sesión.
-
-Resultado: 
-El usuario autenticado accede solo a las funciones autorizadas.
-Referencias: 
-RF-002, RF-003; RN-002, RN-003.
-
-### FL-002 - Actualización de contraseña
-Objetivo: 
-Que el usuario cambie su contraseña.
-Actores: 
-Cualquier usuario autenticado.
-Precondiciones: 
-Sesión iniciada.
-Flujo principal:
-1. El usuario solicita cambiar su contraseña e ingresa la nueva.
-2. El sistema valida la solicitud y almacena la contraseña cifrada.
-3. El sistema confirma el cambio.
-
-Alternativos: 
-A1. Cambio obligatorio por `debe_cambiar_password` (FL-001).
-Excepciones: 
-E1. Verificación fallida: se mantiene la contraseña actual.
-Resultado: 
-La contraseña queda actualizada; nunca se muestra la anterior.
-Referencias: 
-RF-003; RN-002.
+### FL-002 - Actualización de contraseña (no vigente en su parte de acceso)
+**Estado:** no hay cambio obligatorio, restablecimiento ni recuperación de contraseña desde la interfaz. BCrypt se usa para generar hashes en la administración de usuarios y para verificarlos en el login básico. Las columnas de intentos, bloqueo y `ultimo_login` no se usan (`SEGURIDAD.md`, `MODELO_DATOS.md` §4.2).
+**Referencias:** RF-003 y RN-002: marcados como no vigentes en su parte de ingreso, intentos y bloqueo.
 
 ## 3. Flujos de empresa
 
@@ -149,20 +105,20 @@ RF-014; RN-019.
 ### FL-006 - Gestionar usuarios de la empresa
 Objetivo: 
 Controlar quién publica ofertas por la empresa.
-Actores: 
+Actores (datos de dominio, sin control de acceso): 
 `ADMIN_EMPRESA`, coordinador o administrador.
 Precondiciones: 
-La empresa está registrada y activa; el usuario tiene el rol `REPRESENTANTE_EMPRESA`.
+La empresa está registrada y activa; el usuario tiene el rol `REPRESENTANTE_EMPRESA` como dato de dominio.
 Flujo principal:
 1. El actor vincula al usuario a la empresa como `ADMIN_EMPRESA` o `PUBLICADOR`.
 2. El sistema valida y registra la membresía.
 
 Alternativos: 
-A1. El actor desactiva una membresía; el acceso se desactiva, no se elimina.
+A1. Se desactiva una membresía; el registro se conserva, no se elimina. No hay sesión ni permisos que se desactiven.
 Excepciones: 
 E1. El primer miembro no es `ADMIN_EMPRESA`, o se intenta dejar la empresa sin administrador activo: se rechaza.
 Resultado: 
-El usuario opera solo dentro de su empresa.
+El usuario queda vinculado a la empresa como dato de dominio; la operación no depende de un usuario autenticado ni de un ámbito de acceso.
 Referencias: 
 RF-007; RN-009.
 
@@ -283,7 +239,7 @@ Mantener facultades, carreras, periodos, tipos de práctica y requisitos.
 Actores: 
 Administrador; coordinador (requisitos).
 Precondiciones: 
-Usuario con permisos.
+Sin sesión ni verificación de permisos por rol; los roles son datos de dominio.
 Flujo principal:
 1. El actor registra o modifica facultades y carreras.
 2. Registra periodos académicos con sus fechas.
@@ -541,7 +497,7 @@ Apoyar la gestión y el control institucional.
 Actores: 
 Autoridad; coordinador; administrador.
 Precondiciones: 
-Usuario con permisos de consulta.
+Sin sesión ni verificación de permisos por rol; la consulta no depende del rol `AUTORIDAD`.
 Flujo principal:
 1. El actor selecciona un reporte o consulta de auditoría y sus filtros.
 2. El sistema presenta la información consolidada.
@@ -566,11 +522,11 @@ Situaciones que afectan a varios flujos.
 | Práctica cancelada o rechazada | Su postulación aceptada pasa a `CANCELADA` y se libera la plaza. | FL-017 | RN-026 |
 | Estudiante con práctica vigente en el periodo | No puede ser aceptado en otra oferta del mismo periodo. | FL-016 | RN-021 |
 | Estudiante retira y vuelve a postular | Permitido solo tras `RETIRADA`; no tras rechazo, aceptación o cancelación. | FL-008, FL-009 | RN-019 |
-| Corrección de una decisión ya tomada | Solo coordinador o administrador, con motivo y auditoría; no por el flujo ordinario. | FL-016 | RN-018 (CR-4) |
+| Corrección de una decisión ya tomada | Se realiza con motivo y auditoría; no por el flujo ordinario. No hay restricción por rol o ámbito. | FL-016 | RN-018 (CR-4) |
 | Sin periodo activo | No se pueden enviar ni aprobar ofertas, ni aceptar postulaciones. | FL-003, FL-015, FL-016 | RN-006, RN-012 |
-| Usuario de empresa desactivado o sin rol | Pierde sus permisos de inmediato; sus ofertas no se eliminan. | FL-003, FL-006 | RN-009 |
-| Cuenta bloqueada | Se deniega el acceso hasta que venza el bloqueo. | FL-001 | RN-002 |
-| Operación sin usuario identificado | No se completa la operación auditable. | Todos | RN-039 |
+| Usuario de empresa desactivado o sin rol | `REPRESENTANTE_EMPRESA`, `ADMIN_EMPRESA` y `PUBLICADOR` son datos de dominio; no hay pérdida de permisos por sesión ni por rol. Las ofertas no se eliminan por este dato. | FL-003, FL-006 | RN-009 |
+| Cuenta bloqueada | No vigente; pendiente a futuro. No hay bloqueo de cuentas ni denegación de acceso. | FL-001 | RN-002 |
+| Operación sin usuario identificado | La aplicación ya no fija `praxis.usuario_id`; los triggers que lo requieran pueden rechazar la escritura (`CONTEXTO_ACTOR.md`). No se inventa un actor. | Todos | RN-039 |
 
 **Concurrencia básica del MVP:** la aceptación de postulaciones usa control optimista (`@Version` en `postulacion`) y comprueba y reserva la plaza dentro de la misma transacción que crea la práctica `APROBADA`; si otra operación ocupó la plaza o modificó la postulación, responde 409 `CONFLICTO_CONCURRENCIA`. La asignación de responsables usa control optimista (`@Version` en `practica`) y responde 409 `CONFLICTO_CONCURRENCIA` si otra operación modificó la práctica; no reserva plazas. No se usan bloqueos distribuidos, colas ni mecanismos externos.
 

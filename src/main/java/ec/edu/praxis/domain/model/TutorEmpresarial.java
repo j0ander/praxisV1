@@ -12,7 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Entidad de la tabla tutor_empresarial (MODELO_DATOS.md §4.11). */
+
 @Entity
 @Table(name = "tutor_empresarial")
 public class TutorEmpresarial {

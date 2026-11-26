@@ -5,8 +5,6 @@ import java.util.List;
 
 import ec.edu.praxis.application.service.CarreraService;
 import ec.edu.praxis.domain.model.Carrera;
-import io.quarkus.security.Authenticated;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -19,8 +17,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
-/** API-010 a API-013: consulta y administración de carreras. */
-@Authenticated
+
 @Path("/carreras")
 @Produces(MediaType.APPLICATION_JSON)
 public class CarreraResource {
@@ -44,7 +41,6 @@ public class CarreraResource {
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response crear(Carrera carrera) {
         return Response.status(Response.Status.CREATED)
                 .entity(new CarreraResponse(service.crear(carrera)))
@@ -53,12 +49,10 @@ public class CarreraResource {
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
-    @RolesAllowed("ADMINISTRADOR")
     public Response actualizar(Carrera carrera) {
         return Response.ok(new CarreraResponse(service.actualizar(carrera))).build();
     }
 
-    /** Estructura de salida: no se devuelve la entidad JPA directamente. */
     public static class CarreraResponse {
 
         private final Long id;

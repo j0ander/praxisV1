@@ -5,7 +5,6 @@ import CampoFormulario from '../../components/comunes/CampoFormulario';
 import MensajeEstado from '../../components/comunes/MensajeEstado';
 import Modal from '../../components/comunes/Modal';
 import Tabla from '../../components/comunes/Tabla';
-import { useSesion } from '../../contextos/SesionContexto';
 import { mensajeDeError } from '../../services/api';
 import {
   activarPeriodo,
@@ -48,9 +47,6 @@ function validarFormulario(formulario) {
 }
 
 export default function Periodos() {
-  const { tieneRol } = useSesion();
-  const esAdmin = tieneRol('ADMINISTRADOR');
-
   const [periodos, setPeriodos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -234,44 +230,42 @@ export default function Periodos() {
     },
   ];
 
-  if (esAdmin) {
-    columnas.push({
-      clave: 'acciones',
-      titulo: 'Acciones',
-      render: (periodo) => (
-        <div className="acciones">
+  columnas.push({
+    clave: 'acciones',
+    titulo: 'Acciones',
+    render: (periodo) => (
+      <div className="acciones">
+        <Boton
+          variante="enlace"
+          pequeno
+          disabled={ocupado}
+          onClick={() => abrirEditar(periodo)}
+        >
+          Editar
+        </Boton>
+        {periodo.activo ? (
           <Boton
             variante="enlace"
             pequeno
             disabled={ocupado}
-            onClick={() => abrirEditar(periodo)}
+            onClick={() => pedirDesactivacion(periodo)}
           >
-            Editar
+            Desactivar
           </Boton>
-          {periodo.activo ? (
-            <Boton
-              variante="enlace"
-              pequeno
-              disabled={ocupado}
-              onClick={() => pedirDesactivacion(periodo)}
-            >
-              Desactivar
-            </Boton>
-          ) : (
-            <Boton
-              variante="enlace"
-              pequeno
-              cargando={activandoId === periodo.id}
-              disabled={ocupado && activandoId !== periodo.id}
-              onClick={() => activar(periodo)}
-            >
-              Activar
-            </Boton>
-          )}
-        </div>
-      ),
-    });
-  }
+        ) : (
+          <Boton
+            variante="enlace"
+            pequeno
+            cargando={activandoId === periodo.id}
+            disabled={ocupado && activandoId !== periodo.id}
+            onClick={() => activar(periodo)}
+          >
+            Activar
+          </Boton>
+        )}
+      </div>
+    ),
+  });
 
   return (
     <>
@@ -280,11 +274,9 @@ export default function Periodos() {
           <h1>Períodos académicos</h1>
           <p>Registre los períodos académicos y fije el vigente.</p>
         </div>
-        {esAdmin ? (
-          <Boton onClick={abrirCrear} disabled={ocupado}>
-            Nuevo período
-          </Boton>
-        ) : null}
+        <Boton onClick={abrirCrear} disabled={ocupado}>
+          Nuevo período
+        </Boton>
       </div>
 
       <MensajeEstado tipo={resultado?.tipo} mensaje={resultado?.mensaje} />

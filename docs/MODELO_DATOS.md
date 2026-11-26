@@ -8,7 +8,7 @@ Documenta la estructura existente de la base de datos de PRAXIS. Es la referenci
 |---|---|
 | Motor | PostgreSQL 15+ (diseñado para PG 17). |
 | Contenido | 35 tablas, 2 vistas, funciones y triggers. |
-| Zona horaria de negocio | `America/Guayaquil` (vistas y triggers). |
+| Zona horaria | La base y sus vistas/triggers conservan su configuración; la aplicación no configura `America/Guayaquil` ni convierte fechas a esa zona. Las fechas automáticas en código usan `LocalDate.now()`; las columnas `TIMESTAMPTZ` gestionadas por la base se leen como `OffsetDateTime`. |
 
 | Módulo | Tablas |
 |---|---|
@@ -76,6 +76,8 @@ Cuentas de usuario.
 | ultimo_login | TIMESTAMPTZ | Sí | – | Último ingreso. |
 | created_at | TIMESTAMPTZ | No | – | Def: NOW(). |
 | updated_at | TIMESTAMPTZ | No | – | Def: NOW(). |
+
+> Las columnas `hash_password`, `debe_cambiar_password`, `intentos_fallidos`, `bloqueado_hasta` y `ultimo_login` permanecen en el esquema porque no se modifica la base. El login básico lee `hash_password` y `activo`; BCrypt se usa para generar y verificar hashes. `debe_cambiar_password`, `intentos_fallidos`, `bloqueado_hasta` y `ultimo_login` no se usan. `alcance_global` se conserva como dato de dominio, sin control de acceso por ámbito (`SEGURIDAD.md`).
 
 ### 4.3. usuario_rol
 Relación usuario–rol. Clave primaria compuesta.
@@ -797,7 +799,7 @@ Los triggers de `updated_at` (`set_updated_at`, `BEFORE UPDATE`) existen en toda
 | evaluacion | trg_proteger_evaluacion | BEFORE INSERT/UPDATE/DELETE | `proteger_evaluacion()` | Solo con práctica `EN_CURSO` o `HORAS_COMPLETAS`. |
 | empresa_usuario | trg_validar_empresa_usuario | BEFORE INSERT/UPDATE/DELETE | `validar_empresa_usuario()` | Reglas de membresía; no se borra. |
 | empresa_usuario | trg_auditar_empresa_usuario | AFTER INSERT/UPDATE | `auditar_empresa_usuario()` | Registra en `auditoria`. |
-| oferta_practica | trg_validar_oferta | BEFORE INSERT/UPDATE | `validar_oferta()` | Estados, autorización por acción, revalidaciones y snapshots. |
+| oferta_practica | trg_validar_oferta | BEFORE INSERT/UPDATE | `validar_oferta()` | Estados, validación de transiciones por acción, revalidaciones y snapshots. |
 | oferta_practica | trg_auditar_cambios_cabecera_oferta | AFTER UPDATE | `auditar_cambios_cabecera_oferta()` | Registra cambios de cabecera en `auditoria`. |
 | oferta_practica | trg_proteger_borrado_oferta | BEFORE DELETE | `proteger_borrado_oferta()` | Impide borrar. |
 | oferta_practica | trg_registrar_historial_oferta | AFTER INSERT / UPDATE OF estado | `registrar_historial_oferta()` | Escribe `oferta_estado_historial`. |
@@ -835,7 +837,7 @@ Los scripts definen **40 funciones** (14 en `V1` y 26 en `V3`) y ningún procedi
 | `proteger_informe_archivo()` | `V1` | plpgsql / VOLATILE | `trg_proteger_informe_archivo`. |
 | `proteger_evaluacion()` | `V1` | plpgsql / VOLATILE | `trg_proteger_evaluacion`. |
 | `praxis_actor()` | `V3` | sql / STABLE | Auxiliar. La invocan funciones de auditoría y validación de `V3`: `validar_empresa_usuario()`, `auditar_empresa_usuario()`, `validar_oferta()`, `auditar_cambios_cabecera_oferta()`, `registrar_historial_oferta()`, `oferta_hijo_modificado()`, `registrar_cambio_oferta_hijo()`, `validar_postulacion()`, `auditar_postulacion()`, `auditar_creacion_postulacion()`, `registrar_recomendacion_historial()` y `validar_practica_postulacion()`. |
-| `praxis_sistema()` | `V3` | sql / STABLE | Auxiliar. La invocan `validar_oferta()` (autorización de `CERRADA`) y `registrar_historial_oferta()`. |
+| `praxis_sistema()` | `V3` | sql / STABLE | Auxiliar. La invocan `validar_oferta()` (validación de la transición a `CERRADA`) y `registrar_historial_oferta()`. |
 | `tiene_rol_activo(p_usuario BIGINT, p_codigo TEXT)` | `V3` | sql / STABLE | Auxiliar. La invocan `es_coordinador_activo()`, `validar_empresa_usuario()`, `validar_oferta()`, `validar_postulacion()` y `validar_practica_postulacion()`. |
 | `es_coordinador_activo(p_usuario BIGINT)` | `V3` | sql / STABLE | Auxiliar; definida en `V3` pero no invocada por ningún trigger del script (los controles usan `tiene_rol_activo(..., 'COORDINADOR')`). |
 | `empresa_membresia_id(p_usuario BIGINT, p_empresa BIGINT)` | `V3` | sql / STABLE | Auxiliar. La invocan `empresa_rol_activo()` y `validar_postulacion()`. |
@@ -861,11 +863,13 @@ Los scripts definen **40 funciones** (14 en `V1` y 26 en `V3`) y ningún procedi
 | `sincronizar_postulacion_con_practica()` | `V3` | plpgsql / VOLATILE | `trg_sincronizar_postulacion_practica`. |
 | `cerrar_ofertas_vencidas()` | `V3` | plpgsql / VOLATILE | Sin trigger; la invoca el backend periódicamente (`SELECT cerrar_ofertas_vencidas();`). Devuelve `INT`. |
 
-### 7.3. Contexto de sesión requerido por los triggers
+### 7.3. Contexto de sesión requerido por los triggers (ya no se fija desde la aplicación)
 
-Varios triggers leen parámetros de la transacción (`set_config(..., true)`):
+La aplicación eliminó el disparador de parámetros de sesión: no ejecuta `set_config(..., true)` ni fija `praxis.usuario_id`, `praxis.motivo` ni `praxis.sistema`. No se inventa un usuario fijo ni un usuario \"sistema\" para evitar un rechazo. El detalle y el pendiente están en `CONTEXTO_ACTOR.md`.
 
-| Parámetro | Uso |
+Los triggers de la base pueden leer estos parámetros según el DDL de solo lectura:
+
+| Parámetro | Uso en la base |
 |---|---|
 | `praxis.usuario_id` | Usuario autenticado; obligatorio en operaciones auditadas, ofertas, postulaciones, membresías y cambios de perfiles. |
 | `praxis.motivo` | Motivo de rechazos, cancelaciones y correcciones. |
@@ -873,6 +877,8 @@ Varios triggers leen parámetros de la transacción (`set_config(..., true)`):
 | `praxis.desvincular_postulacion` | `'true'` solo en la operación administrativa que desvincula una práctica de su postulación. |
 | `praxis.correccion_decision` | `'true'` solo en la corrección administrativa de una postulación resuelta. |
 | `praxis.sync_practica` | Uso interno del trigger de sincronización con la práctica. |
+
+Como la aplicación ya no fija el contexto, las escrituras dependientes de esos parámetros pueden ser rechazadas por la base. El esquema, los triggers y los parámetros no se modifican.
 
 ## 8. Índices
 
@@ -980,12 +986,12 @@ Observaciones sobre la estructura
 
 Comportamiento que afecta al acceso a datos
 9. Los triggers pueden cambiar valores al guardar: estados (una oferta publicada editada pasa a `PENDIENTE_REVISION`), `motivo_decision`, fechas de resolución y publicación, y snapshots. El valor almacenado puede diferir del enviado.
-10. Los triggers rechazan operaciones sin el contexto de sesión de la sección 7.3.
+10. Los triggers pueden rechazar operaciones sin el contexto de sesión de la sección 7.3: la aplicación ya no lo fija y el esquema no se modifica.
 11. `trg_postulacion_requiere_practica` y `trg_practica_mantiene_postulacion` son diferidos: sus errores aparecen al confirmar la transacción, no al ejecutar la sentencia.
-12. Las columnas gestionadas por trigger no deben editarse directamente: snapshots de oferta, `fecha_primera_publicacion`, `fecha_publicacion`, `resuelta_por_usuario_id` y `fecha_resolucion` de la oferta; en `postulacion`, `fecha_evaluacion_empresa`, `resuelta_por`, `fecha_resolucion`, `motivo_decision`, `cancelada_por` y `fecha_cancelacion`; y en `practica`, los snapshots académicos (congelados por `trg_proteger_snapshots`). Ver §7.3 para el contexto de sesión requerido.
+12. Las columnas gestionadas por trigger no deben editarse directamente: snapshots de oferta, `fecha_primera_publicacion`, `fecha_publicacion`, `resuelta_por_usuario_id` y `fecha_resolucion` de la oferta; en `postulacion`, `fecha_evaluacion_empresa`, `resuelta_por`, `fecha_resolucion`, `motivo_decision`, `cancelada_por` y `fecha_cancelacion`; y en `practica`, los snapshots académicos (congelados por `trg_proteger_snapshots`). La sección 7.3 documenta que el contexto de sesión ya no se fija desde la aplicación.
 
 Pendientes (no resueltos por el esquema)
-13. No existe tabla para tokens de recuperación de contraseña.
+13. No existe tabla para tokens de recuperación de contraseña; esa función no está vigente y queda pendiente a futuro.
 14. El límite de 8 horas diarias (`chk_registro_horas_rango`) y de 2 MB por informe (`chk_archivo_tamano`) están fijos en restricciones.
 15. `tipo_practica`, `requisito` y el resto de catálogos académicos no tienen datos iniciales. La aplicación no inserta datos institucionales ni de prueba: gestiona listados vacíos y valida solo los requisitos que existan. La administración de requisitos permanece fuera del MVP (CR-6).
 16. `usuario.alcance_global` y `usuario_carrera` existen, pero la base de datos no impone cómo se usan.

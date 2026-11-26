@@ -13,7 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
-/** Convenios: API-043 a API-047. */
+
 @ApplicationScoped
 public class ConvenioService {
 
@@ -25,19 +25,11 @@ public class ConvenioService {
     @Inject
     EmpresaRepository empresaRepository;
 
-    /** Proyección de respuesta de API-043; el Resource la envuelve sin importar del Repository. */
-    public List<ConvenioResumen> listarPorEmpresa(Long empresaId, Long actorId, boolean esInstitucional,
-            boolean esRepresentante) {
+    public List<ConvenioResumen> listarPorEmpresa(Long empresaId) {
         if (empresaId == null) {
             throw ApiException.datosInvalidos("El id de la empresa es obligatorio.");
         }
         validarEmpresa(empresaId);
-        if (!esInstitucional) {
-            boolean permitido = esRepresentante && empresaRepository.perteneceAUsuario(empresaId, actorId);
-            if (!permitido) {
-                throw ApiException.noEncontrado("Empresa no encontrada.");
-            }
-        }
         return repository.listarResumenPorEmpresa(empresaId).stream()
                 .map(ConvenioResumen::de).toList();
     }
@@ -87,8 +79,8 @@ public class ConvenioService {
     @Transactional
     public void terminar(Long id) {
         Convenio convenio = obtener(id);
-        // VENCIDO es un estado efectivo derivado de un convenio persistentemente
-        // VIGENTE, por lo que también puede terminarse. TERMINADO es final.
+
+        
         if (convenio.getEstado() != EstadoConvenio.VIGENTE
                 && convenio.getEstado() != EstadoConvenio.SUSPENDIDO) {
             throw ApiException.reglaNegocio("El convenio ya está TERMINADO.");
@@ -157,7 +149,6 @@ public class ConvenioService {
         }
     }
 
-    /** Proyección de solo lectura que el Service entrega al Resource de API-043. */
     public static class ConvenioResumen {
 
         private final Long id;
@@ -171,7 +162,6 @@ public class ConvenioService {
         private final OffsetDateTime createdAt;
         private final OffsetDateTime updatedAt;
 
-        /** Constructor público para pruebas y reutilización; no expone la proyección del Repository. */
         public ConvenioResumen(Long id, Long empresaId, String numero, LocalDate fechaInicio,
                 LocalDate fechaFin, EstadoConvenio estado, String estadoEfectivo, String documentoUrl,
                 OffsetDateTime createdAt, OffsetDateTime updatedAt) {
@@ -189,10 +179,10 @@ public class ConvenioService {
 
         private static ConvenioResumen de(Resumen resumen) {
             return new ConvenioResumen(
-                    resumen.getId(), resumen.getEmpresaId(), resumen.getNumero(),
-                    resumen.getFechaInicio(), resumen.getFechaFin(), resumen.getEstado(),
-                    resumen.getEstadoEfectivo(), resumen.getDocumentoUrl(),
-                    resumen.getCreatedAt(), resumen.getUpdatedAt());
+        resumen.getId(), resumen.getEmpresaId(), resumen.getNumero(),
+        resumen.getFechaInicio(), resumen.getFechaFin(), resumen.getEstado(),
+        resumen.getEstadoEfectivo(), resumen.getDocumentoUrl(),
+        resumen.getCreatedAt(), resumen.getUpdatedAt());
         }
 
         public Long getId() {

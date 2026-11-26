@@ -1,12 +1,10 @@
 import React from 'react';
 
 import { nombreRol } from '../../constantes';
-import { useSesion } from '../../contextos/SesionContexto';
 import Boton from '../comunes/Boton';
 
-export default function Encabezado() {
-  const { sesion, cerrar } = useSesion();
-  const roles = (sesion?.roles || []).map(nombreRol).join(', ');
+export default function Encabezado({ usuario, onCerrarSesion }) {
+  const roles = usuario?.roles || [];
 
   return (
     <header className="encabezado">
@@ -19,9 +17,11 @@ export default function Encabezado() {
           </div>
         </div>
         <div className="usuario">
-          <span className="usuario__nombre">{sesion?.nombres || sesion?.correo}</span>
-          <span className="usuario__rol">{roles}</span>
-          <Boton variante="secundario" pequeno onClick={cerrar}>
+          <div>
+            <p className="usuario__nombre">{usuario?.nombres} {usuario?.apellidos}</p>
+            <p className="usuario__rol">{roles.map(nombreRol).join(', ') || 'Sin roles asignados'}</p>
+          </div>
+          <Boton variante="secundario" pequeno onClick={onCerrarSesion}>
             Cerrar sesión
           </Boton>
         </div>

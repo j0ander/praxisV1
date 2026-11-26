@@ -1,18 +1,18 @@
--- ============================================================
--- PRAXIS — V1__esquema.sql  (PostgreSQL 15+; probado en diseño para PG 17)
--- 26 tablas + 1 vista. Triggers al final.
--- Convenciones: snake_case singular; PK BIGINT IDENTITY; TIMESTAMPTZ para eventos.
--- Snapshots de practica: se fijan al postular y quedan congelados al salir de POSTULADA.
--- ============================================================
+
+
+
+
+
+
 
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
 $$ LANGUAGE plpgsql;
 
--- ============================================================
--- 1. SEGURIDAD Y CATÁLOGOS
--- ============================================================
+
+
+
 
 CREATE TABLE rol (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -27,7 +27,7 @@ CREATE TABLE rol (
 );
 
 CREATE TABLE usuario (
-    id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     correo                VARCHAR(120) NOT NULL UNIQUE,
     hash_password         VARCHAR(72)  NOT NULL,
     nombres               VARCHAR(100) NOT NULL,
@@ -139,7 +139,7 @@ CREATE TABLE empresa (
     CONSTRAINT chk_empresa_ruc CHECK (ruc ~ '^[0-9]{13}$')
 );
 
--- Decisión: un tutor pertenece a una sola empresa (usuario_id UNIQUE)
+
 CREATE TABLE tutor_empresarial (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     usuario_id BIGINT      NOT NULL UNIQUE REFERENCES usuario(id) ON DELETE RESTRICT,
@@ -147,20 +147,20 @@ CREATE TABLE tutor_empresarial (
     cargo      VARCHAR(100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_tutor_empresa UNIQUE (id, empresa_id)   -- para FK compuesta desde practica
+    CONSTRAINT uq_tutor_empresa UNIQUE (id, empresa_id)   
 );
 CREATE INDEX idx_tutor_empresa ON tutor_empresarial(empresa_id);
 
--- ============================================================
--- 2. REQUISITOS
--- ============================================================
+
+
+
 
 CREATE TABLE requisito (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nombre      VARCHAR(150) NOT NULL,
     descripcion TEXT,
     obligatorio BOOLEAN      NOT NULL DEFAULT TRUE,
-    carrera_id  BIGINT       REFERENCES carrera(id) ON DELETE RESTRICT,  -- NULL = global
+    carrera_id  BIGINT       REFERENCES carrera(id) ON DELETE RESTRICT,  
     activo      BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -191,9 +191,9 @@ CREATE INDEX idx_req_estudiante_estado  ON requisito_estudiante(estudiante_id, e
 CREATE INDEX idx_req_estudiante_req     ON requisito_estudiante(requisito_id);
 CREATE INDEX idx_req_estudiante_periodo ON requisito_estudiante(periodo_id);
 
--- ============================================================
--- 3. PROCESO CENTRAL
--- ============================================================
+
+
+
 
 CREATE TABLE convenio (
     id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -207,11 +207,11 @@ CREATE TABLE convenio (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT chk_convenio_fechas CHECK (fecha_fin >= fecha_inicio),
     CONSTRAINT chk_convenio_estado CHECK (estado IN ('VIGENTE','SUSPENDIDO','TERMINADO')),
-    CONSTRAINT uq_convenio_empresa UNIQUE (id, empresa_id)   -- para FK compuesta desde practica
+    CONSTRAINT uq_convenio_empresa UNIQUE (id, empresa_id)   
 );
 CREATE INDEX idx_convenio_empresa_estado ON convenio(empresa_id, estado);
 
--- VENCIDO se deriva aquí (zona Ecuador); los servicios leen estado_efectivo
+
 CREATE OR REPLACE VIEW v_convenio_estado AS
 SELECT c.id, c.empresa_id, c.numero, c.fecha_inicio, c.fecha_fin, c.estado,
        CASE
@@ -234,7 +234,7 @@ CREATE TABLE tipo_practica (
 );
 
 CREATE TABLE practica (
-    id                        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     estudiante_id             BIGINT       NOT NULL REFERENCES estudiante(id)        ON DELETE RESTRICT,
     carrera_id                BIGINT       NOT NULL REFERENCES carrera(id)           ON DELETE RESTRICT,
     empresa_id                BIGINT       NOT NULL REFERENCES empresa(id)           ON DELETE RESTRICT,
@@ -243,7 +243,7 @@ CREATE TABLE practica (
     periodo_id                BIGINT       NOT NULL REFERENCES periodo_academico(id) ON DELETE RESTRICT,
     docente_id                BIGINT       REFERENCES docente(id) ON DELETE RESTRICT,
     tutor_empresarial_id      BIGINT,
-    estado                    VARCHAR(30)  NOT NULL DEFAULT 'POSTULADA',
+    estado        VARCHAR(30)  NOT NULL DEFAULT 'POSTULADA',
     horas_requeridas_snapshot NUMERIC(6,2) NOT NULL,
     nota_minima_snapshot      NUMERIC(4,2) NOT NULL,
     fecha_postulacion         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -300,7 +300,7 @@ CREATE INDEX idx_practica_tipo               ON practica(tipo_practica_id);
 CREATE INDEX idx_practica_convenio           ON practica(convenio_id, empresa_id);
 CREATE INDEX idx_practica_creado_por         ON practica(creado_por);
 
--- Una sola práctica "viva" por estudiante y periodo
+
 CREATE UNIQUE INDEX uq_practica_activa_por_periodo
     ON practica(estudiante_id, periodo_id)
     WHERE estado NOT IN ('RECHAZADA','CANCELADA','REPROBADA');
@@ -386,9 +386,9 @@ CREATE TABLE informe_archivo (
     CONSTRAINT chk_archivo_sha256      CHECK (sha256 ~ '^[0-9a-f]{64}$')
 );
 
--- ============================================================
--- 4. SEGUIMIENTO, REVISIÓN Y AUDITORÍA
--- ============================================================
+
+
+
 
 CREATE TABLE evaluacion (
     id                   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -452,9 +452,9 @@ CREATE TABLE certificado (
     CONSTRAINT chk_certificado_snapshot  CHECK (jsonb_typeof(datos_snapshot) = 'object'),
     CONSTRAINT chk_certificado_anulacion CHECK (
         (estado = 'VIGENTE' AND fecha_anulacion IS NULL
-                            AND anulado_por IS NULL AND motivo_anulacion IS NULL)
+        AND anulado_por IS NULL AND motivo_anulacion IS NULL)
         OR (estado = 'ANULADO' AND fecha_anulacion IS NOT NULL
-                               AND anulado_por IS NOT NULL AND motivo_anulacion IS NOT NULL))
+        AND anulado_por IS NOT NULL AND motivo_anulacion IS NOT NULL))
 );
 CREATE UNIQUE INDEX uq_certificado_vigente_por_practica
     ON certificado(practica_id) WHERE estado = 'VIGENTE';
@@ -471,11 +471,12 @@ CREATE TABLE auditoria (
 CREATE INDEX idx_auditoria_usuario_fecha ON auditoria(usuario_id, fecha DESC);
 CREATE INDEX idx_auditoria_entidad       ON auditoria(entidad, entidad_id);
 
--- ============================================================
--- 5. TRIGGERS
--- ============================================================
 
--- 5.1 updated_at automático
+
+
+
+
+
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -495,8 +496,8 @@ BEGIN
     END LOOP;
 END $$;
 
--- 5.2 registro_horas: fecha válida (zona Ecuador), dentro de rango y práctica EN_CURSO
---     (aplica también al validar, que es un UPDATE: intencional)
+
+
 CREATE OR REPLACE FUNCTION validar_registro_horas()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -524,7 +525,7 @@ CREATE TRIGGER trg_validar_registro_horas
     BEFORE INSERT OR UPDATE ON registro_horas
     FOR EACH ROW EXECUTE FUNCTION validar_registro_horas();
 
--- 5.3 registro_horas: validados inmutables (UPDATE y DELETE)
+
 CREATE OR REPLACE FUNCTION bloquear_horas_validadas()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -549,7 +550,7 @@ CREATE TRIGGER trg_bloquear_horas_validadas
     BEFORE UPDATE OR DELETE ON registro_horas
     FOR EACH ROW EXECUTE FUNCTION bloquear_horas_validadas();
 
--- 5.4 practica: carrera_id debe coincidir con la del estudiante al insertar
+
 CREATE OR REPLACE FUNCTION validar_practica_insert()
 RETURNS TRIGGER AS $$
 DECLARE v_carrera BIGINT;
@@ -567,7 +568,7 @@ CREATE TRIGGER trg_validar_practica_insert
     BEFORE INSERT ON practica
     FOR EACH ROW EXECUTE FUNCTION validar_practica_insert();
 
--- 5.5 practica: no borrar prácticas alguna vez aprobadas
+
 CREATE OR REPLACE FUNCTION proteger_borrado_practica()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -581,7 +582,7 @@ CREATE TRIGGER trg_proteger_borrado_practica
     BEFORE DELETE ON practica
     FOR EACH ROW EXECUTE FUNCTION proteger_borrado_practica();
 
--- 5.6 practica: snapshots/llaves fijados al postular, congelados al salir de POSTULADA
+
 CREATE OR REPLACE FUNCTION proteger_snapshots_practica()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -602,7 +603,7 @@ CREATE TRIGGER trg_proteger_snapshots
     BEFORE UPDATE ON practica
     FOR EACH ROW EXECUTE FUNCTION proteger_snapshots_practica();
 
--- 5.7 practica: máquina de estados
+
 CREATE OR REPLACE FUNCTION validar_transicion_practica()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -623,8 +624,8 @@ CREATE TRIGGER trg_validar_transicion_practica
     BEFORE UPDATE OF estado ON practica
     FOR EACH ROW EXECUTE FUNCTION validar_transicion_practica();
 
--- 5.8 practica: historial automático (estado inicial + cambios).
---     Usuario y motivo vía set_config('praxis.usuario_id' / 'praxis.motivo', valor, true)
+
+
 CREATE OR REPLACE FUNCTION registrar_historial_practica()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -647,7 +648,7 @@ CREATE TRIGGER trg_registrar_historial_practica
     AFTER INSERT OR UPDATE OF estado ON practica
     FOR EACH ROW EXECUTE FUNCTION registrar_historial_practica();
 
--- 5.9 historial: no editable (DELETE queda permitido para el CASCADE de prácticas nunca aprobadas)
+
 CREATE OR REPLACE FUNCTION proteger_historial_update()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -658,7 +659,7 @@ CREATE TRIGGER trg_proteger_historial_update
     BEFORE UPDATE ON practica_estado_historial
     FOR EACH ROW EXECUTE FUNCTION proteger_historial_update();
 
--- 5.10 auditoria inmutable
+
 CREATE OR REPLACE FUNCTION impedir_modificacion_auditoria()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -669,7 +670,7 @@ CREATE TRIGGER trg_auditoria_inmutable
     BEFORE UPDATE OR DELETE ON auditoria
     FOR EACH ROW EXECUTE FUNCTION impedir_modificacion_auditoria();
 
--- 5.11 certificado: solo para FINALIZADA, inmutable, ANULADO definitivo, no se borra
+
 CREATE OR REPLACE FUNCTION proteger_certificado()
 RETURNS TRIGGER AS $$
 DECLARE v_estado VARCHAR(30);
@@ -706,7 +707,7 @@ CREATE TRIGGER trg_proteger_certificado
     BEFORE INSERT OR UPDATE OR DELETE ON certificado
     FOR EACH ROW EXECUTE FUNCTION proteger_certificado();
 
--- 5.12 informe APROBADO: inmutable y no borrable
+
 CREATE OR REPLACE FUNCTION proteger_informe()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -732,7 +733,7 @@ CREATE TRIGGER trg_proteger_informe
     BEFORE UPDATE OR DELETE ON informe
     FOR EACH ROW EXECUTE FUNCTION proteger_informe();
 
--- 5.13 informe_archivo: no modificar/borrar si el informe está APROBADO
+
 CREATE OR REPLACE FUNCTION proteger_informe_archivo()
 RETURNS TRIGGER AS $$
 DECLARE v_estado VARCHAR(20);
@@ -748,9 +749,9 @@ CREATE TRIGGER trg_proteger_informe_archivo
     BEFORE UPDATE OR DELETE ON informe_archivo
     FOR EACH ROW EXECUTE FUNCTION proteger_informe_archivo();
 
--- 5.14 evaluacion: solo en EN_CURSO / HORAS_COMPLETAS (lista blanca).
---      Si la práctica ya no existe (borrado en cascada de una práctica nunca aprobada),
---      v_estado es NULL y se permite.
+
+
+
 CREATE OR REPLACE FUNCTION proteger_evaluacion()
 RETURNS TRIGGER AS $$
 DECLARE

@@ -9,7 +9,7 @@ import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-/** Entidad de la tabla usuario_carrera (MODELO_DATOS.md §4.6), con clave primaria compuesta. */
+
 @Entity
 @Table(name = "usuario_carrera")
 public class UsuarioCarrera {
@@ -76,7 +76,7 @@ public class UsuarioCarrera {
                 return false;
             }
             return Objects.equals(usuarioId, otraId.usuarioId)
-                    && Objects.equals(carreraId, otraId.carreraId);
+        && Objects.equals(carreraId, otraId.carreraId);
         }
 
         @Override

@@ -1,21 +1,17 @@
 package ec.edu.praxis.application.service;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 import ec.edu.praxis.domain.model.Carrera;
 import ec.edu.praxis.domain.model.Estudiante;
-import ec.edu.praxis.domain.model.Usuario;
 import ec.edu.praxis.infrastructure.repository.CarreraRepository;
 import ec.edu.praxis.infrastructure.repository.EstudianteRepository;
-import ec.edu.praxis.infrastructure.repository.UsuarioCarreraRepository;
 import ec.edu.praxis.infrastructure.repository.UsuarioRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
-/** Perfiles de estudiante (API-033 a API-036). */
+
 @ApplicationScoped
 public class EstudianteService {
 
@@ -30,34 +26,21 @@ public class EstudianteService {
     @Inject
     CarreraRepository carreraRepository;
 
-    @Inject
-    UsuarioCarreraRepository usuarioCarreraRepository;
-
-    public List<Estudiante> listar(Long actorId, boolean esAdmin, Long carreraFiltro) {
-        Set<Long> permitidas = carrerasPermitidas(actorId, esAdmin);
-        if (permitidas == null) {
-            return carreraFiltro == null ? repository.listAll() : repository.listarPorCarrera(carreraFiltro);
-        }
-        if (carreraFiltro != null) {
-            return permitidas.contains(carreraFiltro) ? repository.listarPorCarrera(carreraFiltro) : List.of();
-        }
-        return permitidas.isEmpty() ? List.of() : repository.listarPorCarreras(permitidas);
+    public List<Estudiante> listar(Long carreraFiltro) {
+        return carreraFiltro == null ? repository.listAll() : repository.listarPorCarrera(carreraFiltro);
     }
 
-    public Estudiante buscar(Long id, Long actorId, boolean esAdmin) {
+    public Estudiante buscar(Long id) {
         Estudiante estudiante = repository.findById(id);
         if (estudiante == null) {
             throw ApiException.noEncontrado("Perfil de estudiante no encontrado.");
         }
-        verificarAmbito(carrerasPermitidas(actorId, esAdmin), Set.of(estudiante.getCarreraId()));
         return estudiante;
     }
 
     @Transactional
-    public Estudiante crear(Estudiante datos, Long actorId, boolean esAdmin) {
+    public Estudiante crear(Estudiante datos) {
         validarDatos(datos);
-        Set<Long> permitidas = carrerasPermitidas(actorId, esAdmin);
-        verificarAmbito(permitidas, Set.of(datos.getCarreraId()));
         validarUsuario(datos.getUsuarioId());
         validarCarrera(datos.getCarreraId());
         validarDuplicados(datos.getCodigoEstudiante(), datos.getUsuarioId(), null);
@@ -66,7 +49,7 @@ public class EstudianteService {
     }
 
     @Transactional
-    public Estudiante actualizar(Long id, Estudiante datos, Long actorId, boolean esAdmin) {
+    public Estudiante actualizar(Long id, Estudiante datos) {
         if (id == null) {
             throw ApiException.datosInvalidos("El id del perfil de estudiante es obligatorio.");
         }
@@ -83,9 +66,6 @@ public class EstudianteService {
         datos.setUsuarioId(estudiante.getUsuarioId());
         validarDatos(datos);
 
-        Set<Long> permitidas = carrerasPermitidas(actorId, esAdmin);
-        verificarAmbito(permitidas, Set.of(estudiante.getCarreraId()));
-        verificarAmbito(permitidas, Set.of(datos.getCarreraId()));
         validarCarrera(datos.getCarreraId());
         validarDuplicados(datos.getCodigoEstudiante(), estudiante.getUsuarioId(), estudiante.getId());
 
@@ -94,37 +74,6 @@ public class EstudianteService {
         estudiante.setFechaNacimiento(datos.getFechaNacimiento());
         repository.flush();
         return estudiante;
-    }
-
-    private Set<Long> carrerasPermitidas(Long actorId, boolean esAdmin) {
-        if (esAdmin) {
-            return null;
-        }
-        Usuario actor = usuarioRepository.findById(actorId);
-        if (actor == null) {
-            throw ApiException.noEncontrado("Usuario no encontrado.");
-        }
-        if (actor.isAlcanceGlobal()) {
-            return null;
-        }
-        return Set.copyOf(usuarioCarreraRepository.listarCarrerasPorUsuario(actorId));
-    }
-
-    private void verificarAmbito(Set<Long> permitidas, Set<Long> objetivo) {
-        if (!dentroDeAmbito(permitidas, objetivo)) {
-            throw ApiException.noEncontrado("Perfil de estudiante no encontrado.");
-        }
-    }
-
-    /** Las carreras permitidas en null significan acceso institucional sin restricción. */
-    static boolean dentroDeAmbito(Set<Long> permitidas, Set<Long> objetivo) {
-        if (permitidas == null) {
-            return true;
-        }
-        if (objetivo == null || objetivo.isEmpty()) {
-            return false;
-        }
-        return !Collections.disjoint(permitidas, objetivo);
     }
 
     static void validarDatos(Estudiante datos) {

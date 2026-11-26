@@ -1,4 +1,4 @@
--- V2__catalogos.sql  (producción: solo roles)
+
 INSERT INTO rol (codigo, nombre, descripcion) VALUES
 ('ESTUDIANTE',        'Estudiante',                'Postula, registra horas e informes'),
 ('DOCENTE',           'Docente / Tutor académico', 'Evalúa, aprueba informes, registra visitas'),
